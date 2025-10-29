@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login / Register</title>
+    <link rel="stylesheet" href="css/authStyle.css" />
+</head>
+<body>
+<div class="container">
+    <div class="logo" style="display: flex; align-items: center; margin-bottom: 0;">
+        <img src="logo-blu.png" style="height: 7em; margin-right: 2px;" />
+        <h2 id="formTitle" style="margin: 5px 0;">Login</h2>
+    </div>
+    <div class="form-container" id="loginForm" style="margin-top: 0;">
+        <input type="text" placeholder="Username or Email" />
+        <input type="password" placeholder="Password" />
+        <div id="outputlog" style="color: red; margin-bottom: 10px;"></div>
+        <button>Login</button>
+        <p>Non hai un account? <a href="#" onclick="showRegister()">Registrati</a></p>
+    </div>
+
+    <div class="form-container hidden" id="registerForm" style="margin-top: 0;">
+        <input type="text" placeholder="Nome" />
+        <input type="text" placeholder="Cognome" />
+        <input type="text" placeholder="Username" />
+        <input type="email" placeholder="Email" />
+        <input type="password" placeholder="Password" />
+        <div id="outputreg" style="color: red; margin-bottom: 15px;"></div>
+        <button>Registrati</button>
+        <p>Hai già un account? <a href="#" onclick="showLogin()">Login</a></p>
+    </div>
+</div>
+
+<script src="js/authLogic.js"></script>
+</body>
+</html>

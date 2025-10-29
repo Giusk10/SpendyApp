@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="it">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Ancora Non Implementato</title>
+        <link rel="stylesheet" href="css/notYetStyle.css">
+    </head>
+    <body>
+
+        <header class="header">
+            <button class="back-button" aria-label="Torna indietro" onclick="goBack()">
+                ⬅️
+            </button>
+            <div class="house-icon">🏠</div>
+        </header>
+
+        <main class="content-wrapper">
+            <div class="card under-construction-card">
+                <h1 class="title">Ancora Non Implementato</h1>
+                <p class="message">Siamo al lavoro per offrirti nuove fantastiche funzionalità. Torna a trovarci presto!</p>
+                <div class="construction-images">
+                    <svg class="icon house-people-icon" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 3L2 12h3v8h14v-8h3L12 3zm0 2.38L18.82 12H16v6H8v-6H5.18L12 5.38z"/>
+                        <circle cx="9" cy="14" r="1.5"/>
+                        <path d="M7.5 16.5h3v2h-3z"/>
+                        <circle cx="15" cy="14" r="1.5"/>
+                        <path d="M13.5 16.5h3v2h-3z"/>
+                        <rect x="10.5" y="10.5" width="3" height="3" rx="0.5" ry="0.5"/>
+                        <rect x="7" y="10.5" width="2" height="2" rx="0.3" ry="0.3"/>
+                        <rect x="15" y="10.5" width="2" height="2" rx="0.3" ry="0.3"/>
+                    </svg>
+                </div>
+            </div>
+        </main>
+    </body>
+
+    <script>
+        function goBack() {
+            window.history.back();
+        }
+    </script>
+</html>

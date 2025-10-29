@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login / Register</title>
+    <link rel="stylesheet" href="css/HouseStyle.css" />
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            // Controlla se il token è presente, altrimenti mostra l'immagine e il bottone per autenticarsi
+            if (!localStorage.getItem("token")) {
+                document.body.innerHTML = `
+                <div class="container" style="
+                    background: #f9f9f9;
+                    border-radius: 18px;
+                    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+                    padding: 40px 30px;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    max-width: 400px;
+                    margin: auto;
+                    height: 100vh;
+                    box-sizing: border-box;
+                ">
+                    <img src="/logo-blu.png" alt="Autenticazione richiesta" style="
+                        max-width: 180px;
+                        margin-bottom: 20px;
+                        border-radius: 12px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+                    ">
+                    <p style="
+                        font-size: 1.2em;
+                        margin-top: 10px;
+                        color: #2a3a4a;
+                        text-align: center;
+                        margin-bottom: 30px;
+                    ">
+                        Per favore, autenticati per continuare.
+                    </p>
+                    <button id="access-btn" style="
+                        background-color: #29297f;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        padding: 12px 24px;
+                        font-size: 1em;
+                        cursor: pointer;
+                        transition: background-color 0.3s ease;
+                    ">Accedi</button>
+                </div>
+            `;
+                document.getElementById('access-btn').addEventListener('click', () => {
+                    window.location.href = '/authPage.html'; // Cambia l'URL qui se serve
+                });
+            }
+        });
+    </script>
+
+</head>
+<body>
+<div class="container">
+    <div class="logo" style="display: flex; align-items: center; margin-bottom: 0;">
+        <img src="logo-blu.png" style="height: 7em; margin-right: 2px;" />
+        <div>
+            <h2 id="formTitle" style="margin: 5px 0;">CoinquiHouse</h2>
+
+            <div id="usernameLabel" style="font-size: 1em; color: #333;"></div>
+        </div>
+    </div>
+
+    <div class="form-container" id="loginForm" style="margin-top: 0;">
+        <input type="text" id="loginHouseId" placeholder="House id" />
+        <div id="outputlog" style="color: red; margin-bottom: 15px;"></div>
+        <button>Entra</button>
+        <p>Non hai una casa? <a href="#" onclick="showHouseCreation()">Crea la casa</a></p>
+    </div>
+
+    <div class="form-container hidden" id="registerForm" style="margin-top: 0;">
+        <input type="text" id="regHouseName" placeholder="Name" />
+        <input type="text" id="regHouseAddress" placeholder="Address" />
+        <div id="outputreg" style="color: red; margin-bottom: 15px;"></div>
+        <button>Crea</button>
+        <p>Hai già una casa? <a href="#" onclick="showHouseLogin()">Entra</a></p>
+    </div>
+</div>
+<script src="js/HouseLogic.js"></script>
+</body>
+</html>

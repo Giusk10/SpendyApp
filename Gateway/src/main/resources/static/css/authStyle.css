@@ -1,0 +1,82 @@
+body {
+    font-family: "Segoe UI", sans-serif;
+    background: linear-gradient(135deg, rgba(139, 0, 253, 0.94), #4500fd);
+    margin: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.container {
+    background: white;
+    padding: 2rem;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    width: 300px;
+    transition: all 0.3s ease;
+}
+
+.form-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-container input {
+    margin: 10px 0;
+    padding: 10px;
+    border: 2px solid #4500fd;
+    border-radius: 10px;
+    font-size: 16px;
+}
+
+.profile-image-wrapper {
+    width: 120px;            /* larghezza del cerchio */
+    height: 120px;           /* altezza del cerchio */
+    border-radius: 50%;      /* rende il contenitore circolare */
+    overflow: hidden;        /* nasconde tutto ciò che esce dal cerchio */
+    margin: 0 auto 15px;     /* centra orizzontalmente e aggiunge spazio sotto */
+    background-color: #eee;  /* colore di sfondo leggero */
+    display: flex;           /* usa flexbox per centrare contenuto */
+    align-items: center;     /* centra verticalmente */
+    justify-content: center; /* centra orizzontalmente */
+}
+
+.profile-image-wrapper img {
+    width: 100%; /* immagine riempie il contenitore */
+    height: 100%;
+    object-fit: cover; /* mantiene proporzioni riempiendo il cerchio */
+    border-radius: 50%; /* immagine stessa circolare */
+
+}
+.form-container button {
+    background: rgba(139, 0, 253, 0.94);
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.form-container button:hover {
+    background: #4500fd;
+}
+
+.form-container p {
+    font-size: 14px;
+    margin-top: 10px;
+    text-align: center;
+}
+
+.form-container a {
+    color: rgba(139, 0, 253, 0.94);
+    text-decoration: none;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.hidden {
+    display: none;
+}

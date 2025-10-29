@@ -1,0 +1,305 @@
+body{
+    font-family: "Segoe UI", sans-serif;
+    max-height: 100vh;
+    margin: 0; /* rimuove il margine */
+    background: linear-gradient(135deg, rgba(139, 0, 253, 0.94), #4500fd);
+    box-sizing: border-box;
+    /*background-color: #c2c2f6; /* colore di sfondo */
+
+}
+
+/* stile per la griglia  */
+
+.grid-container{
+    overflow-x: hidden;
+    box-sizing: border-box; /* include il padding e il bordo nella larghezza e altezza */
+    min-height: 100vh;
+    height: 100vh; /* imposta un'altezza fissa per evitare lo scorrimento */
+    padding: 10px 10px 10px 10px;
+    width: 100%;
+    max-width: 100%;
+
+    display: grid;
+    grid-template-columns:
+    minmax(25%, 1fr) minmax(40%, 2fr) minmax(25%, 1fr)  /* colonna per la spesa */;
+    grid-auto-rows: 62px auto auto;
+    grid-template-areas:
+    "header header header"
+    "spesa recap debt"
+    "spesa recap debt"; /* tre righe */
+    gap: 1rem;
+}
+
+/* stile per la navbar */
+
+.nav_bar {
+    top: 0; /* posizione fissa */
+    position: sticky; /* posizione fissa */
+    grid-area: header; /* area del menu */
+
+}
+
+li, a, button{
+    font-family: "Segoe UI", sans-serif; /* font-family del testo */
+    font-weight: 500; /* peso del font */
+    font-size: 16px; /* dimensione del font */
+    color: #8b00fd; /* colore del testo */
+    text-decoration: none; /* rimuove la sottolineatura */
+}
+
+li:hover,  a:hover, button:hover{
+    scale: 1.1;
+
+}
+
+
+/* stile per il menu */
+header{
+    display: flex; /* flexbox per disporre gli elementi */
+    justify-content: space-between; /* distribuisce lo spazio tra gli elementi */
+    align-items: center; /* allinea gli elementi al centro */
+    padding: 30px 0.2px; /* 30px di padding sopra e sotto, 10% a sinistra e a destra */
+
+    /*width: 90%; /* larghezza del 90% */
+    /*max-width: 1000px; /* larghezza massima */
+
+    background: white;
+    /*margin-top: 10px;*/
+    border-radius: 50px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    height: 2px;
+    /*overflow: hidden;*/ /* nasconde gli elementi che escono dalla barra */
+}
+
+.logo{
+    padding: 10px;
+    cursor: pointer; /* cambia il cursore quando si passa sopra */
+    margin-right: auto; /* margine a destra per spingere gli altri elementi a sinistra */
+    order: 1; /* ordine per disporre gli elementi */
+}
+
+.nav{
+    order: 2; /* ordine per disporre gli elementi */
+}
+.nav_links{
+    list-style: none; /* rimuove i pallini */
+    background-color: transparent;
+}
+
+.nav_links li{
+    display: inline-block; /* inline-block dispone gli elementi di fianco non sopra e sotto */
+    padding: 0 20px; /* padding di 0px sopra e sotto, 20px a sinistra e a destra */
+}
+
+.nav_links li:nth-child(1){ /* seleziona il primo elemento della lista */
+    padding: 0 20px 0 0; /* padding di 0px sopra e sotto, 20px a sinistra, 0px a destra */
+}
+
+.nav_links li a {
+    transition : all 0.3s ease 0s; /* transizione per il colore */
+}
+
+.nav_links li a:hover{
+    color: rgba(139, 0, 235, 0.8); /* colore al passaggio del mouse */
+}
+
+.cta{
+    display: flex;
+    order: 3; /* ordine per disporre gli elementi */
+}
+
+button{
+    padding: 9px 25px; /* padding di 9px sopra e sotto, 25px a sinistra e a destra */
+    color: white;
+    background-color: rgba(139, 0, 235, 1); /* colore di sfondo */
+    border: none; /* nessun bordo */
+    border-radius: 50px; /* angoli arrotondati */
+    cursor: pointer; /* cambia il cursore quando si passa sopra */
+    transition : all 0.3s ease 0s; /* transizione per il colore */
+}
+button:hover{
+    background-color: rgba(139, 0, 235, 0.8); /* colore di sfondo */
+}
+
+.profile-img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #8b00fd;
+    margin-right: 20px;
+}
+
+
+/* stile per la sezione spesa */
+
+.spesa {
+    background: white;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    color: #333;
+    height: auto;
+}
+
+/* Larghezze diverse */
+#add-expense-container,
+#debt-container {
+    flex: 1;
+    max-width: 320px;
+}
+
+#expense-list-container {
+    flex: 2.5;
+    max-width: 700px;
+}
+
+/* --- FORM --- */
+.form-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-container input,
+.form-container select {
+    margin: 10px 0;
+    padding: 10px;
+    border: 2px solid #4500fd;
+    border-radius: 10px;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.3s ease;
+}
+
+.form-container input:focus,
+.form-container select:focus {
+    border-color: rgba(139, 0, 253, 0.94);
+}
+
+.form-container button {
+    background: rgba(139, 0, 253, 0.94);
+    color: white;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    margin-top: 10px;
+    width: 100%;
+}
+
+.form-container button:hover {
+    background: #4500fd;
+}
+
+/* --- LISTA SPESE --- */
+
+
+.recap {
+    background: white;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    color: #333;
+    height: auto;
+}
+
+#expense-list {
+    list-style: none;
+    padding-left: 0;
+    overflow-y: auto;
+    max-height: 400px;
+    border-top: 2px solid #4500fd;
+    margin-top: 15px;
+}
+
+#expense-list li-expense {
+    background-color: #f0eaff;
+    border-radius: 10px;
+    padding: 12px 15px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 5px rgba(69, 0, 253, 0.2);
+    font-size: 1rem;
+    color: #4500fd;
+}
+
+#expense-list li-expense .details {
+    display: flex;
+    flex-direction: column;
+}
+
+#expense-list li-expense .details .title {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+#expense-list li-expense .details .meta {
+    font-size: 0.85rem;
+    color: #7a52f9; /* tonalità più chiara */
+}
+
+#expense-list li-expense .amount {
+    font-weight: 700;
+    font-size: 1.1rem;
+    color: #8b00fd;
+}
+
+/* --- RIASSUNTO --- */
+.summary {
+    margin-top: auto;
+    font-weight: bold;
+    font-size: 1.2rem;
+    text-align: right;
+    color: #4500fd;
+}
+
+/* --- DEBITI --- */
+
+.debt {
+    background: white;
+    padding: 20px;
+    border-radius: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s ease;
+    color: #333;
+    height: auto;
+}
+
+#balances {
+    margin-top: 15px;
+    flex-grow: 1;
+    overflow-y: auto;
+    font-size: 1rem;
+    color: #333;
+}
+
+#balances p {
+    font-size: 1rem;
+    color: #4b0082;
+    margin: 10px 0;
+    line-height: 1.4;
+    font-weight: 600;
+    text-align: center;
+}
+
+#balances p.positive {
+    color: green;
+}
+#balances p.negative {
+    color: red;
+}
+#balances p.neutral {
+    color: gray;
+}
