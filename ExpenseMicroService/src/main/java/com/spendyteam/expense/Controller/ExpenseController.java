@@ -108,4 +108,11 @@ public class ExpenseController {
             );
         }
     }
+
+    @PostMapping("/test" )
+    public ResponseEntity<String> testEndpoint() {
+        return ResponseEntity.ok("Expense Microservice is up and running!");
+    }
 }
+
+

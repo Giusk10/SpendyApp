@@ -20,13 +20,6 @@ public class SecurityConfig {
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .authorizeExchange(exchange -> exchange
-                        .pathMatchers(HttpMethod.POST, "/gateway/generate-token").permitAll()
-                        .pathMatchers("/House/**").authenticated()
-                        .pathMatchers("/Expense/**").authenticated()
-                        .pathMatchers("/Dashboard/**").authenticated()
-                        .pathMatchers("/Shift/**").authenticated()
-                        .pathMatchers("/Rank/**").authenticated()
-                        .pathMatchers("/actuator/**").permitAll()
                         .anyExchange().permitAll()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)

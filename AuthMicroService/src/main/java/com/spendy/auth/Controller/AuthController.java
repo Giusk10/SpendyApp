@@ -93,4 +93,10 @@ public class AuthController {
         }
         return null;
     }
+
+    @GET
+    @Path("/health")
+    public Response healthCheck() {
+        return Response.ok("AuthMicroService is running").build();
+    }
 }
