@@ -1,0 +1,78 @@
+.wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+  background: radial-gradient(circle at top, rgba(59, 130, 246, 0.2), transparent 60%),
+    linear-gradient(180deg, rgba(15, 23, 42, 0.8) 0%, rgba(15, 23, 42, 0.95) 60%, rgba(2, 6, 23, 1) 100%);
+}
+
+.card {
+  width: min(420px, 100%);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(16px);
+  border-radius: 24px;
+  padding: 32px;
+  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+}
+
+.title {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.subtitle {
+  margin: 8px 0 24px;
+  text-align: center;
+  color: rgba(226, 232, 240, 0.75);
+}
+
+.tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  background: rgba(30, 41, 59, 0.6);
+  border-radius: 14px;
+  padding: 6px;
+  margin-bottom: 24px;
+}
+
+.tabButton {
+  border: none;
+  border-radius: 12px;
+  padding: 12px 0;
+  background: transparent;
+  color: rgba(226, 232, 240, 0.7);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tabButton:hover {
+  color: #f8fafc;
+}
+
+.active {
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  color: #0f172a;
+  box-shadow: 0 10px 20px rgba(59, 130, 246, 0.35);
+}
+
+.content {
+  margin-top: 24px;
+}
+
+@media (max-width: 480px) {
+  .card {
+    padding: 24px 20px;
+  }
+
+  .title {
+    font-size: 1.6rem;
+  }
+}

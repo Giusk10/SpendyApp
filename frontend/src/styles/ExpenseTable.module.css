@@ -1,0 +1,85 @@
+.card {
+  background: rgba(15, 23, 42, 0.75);
+  border-radius: 24px;
+  padding: 24px;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 24px 40px rgba(15, 23, 42, 0.35);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.count {
+  color: rgba(148, 163, 184, 0.75);
+}
+
+.placeholder {
+  margin: 0;
+  color: rgba(148, 163, 184, 0.75);
+}
+
+.tableWrapper {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.table thead {
+  background: rgba(30, 41, 59, 0.7);
+}
+
+.table th {
+  text-align: left;
+  padding: 12px;
+  font-weight: 600;
+  color: rgba(226, 232, 240, 0.9);
+}
+
+.table td {
+  padding: 12px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+  vertical-align: top;
+}
+
+.description {
+  display: block;
+  font-weight: 600;
+}
+
+.meta {
+  display: block;
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 0.85rem;
+}
+
+.category {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(56, 189, 248, 0.2);
+  color: #bae6fd;
+  font-size: 0.85rem;
+}
+
+.amount {
+  font-weight: 700;
+  color: #fbbf24;
+}
+
+.compact {
+  min-width: unset;
+}
+
+.compact td,
+.compact th {
+  padding: 10px 12px;
+}
