@@ -20,6 +20,8 @@ public class SecurityConfig {
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .authorizeExchange(exchange -> exchange
+                        .pathMatchers(HttpMethod.POST, "/gateway/generate-token").permitAll()
+                        .pathMatchers("/Expense/**").authenticated()
                         .anyExchange().permitAll()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
