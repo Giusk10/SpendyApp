@@ -1,21 +1,27 @@
 package com.spendyteam.expense.Service;
 
+import com.opencsv.CSVParser;
+import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
+import com.opencsv.CSVReaderBuilder;
 import com.spendyteam.expense.Data.Expense;
 import com.spendyteam.expense.Repository.IExpenseRepository;
 import com.spendyteam.expense.Utility.ExpenseClassifier;
 import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
-import java.util.HashMap;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ExpenseImportService {
@@ -28,64 +34,198 @@ public class ExpenseImportService {
             return Response.status(Response.Status.NO_CONTENT).entity("CSV file is empty.").build();
         }
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-
-        try (CSVReader reader = new CSVReader(new InputStreamReader(file.getInputStream()))) {
-            String[] line;
-            reader.readNext(); // Skip header row
-
-            while ((line = reader.readNext()) != null) {
-                Expense expense = new Expense();
-
-                expense.setType(line[0]);
-                expense.setProduct(line[1]);
-
-                // Parsing date/time e conversione a LocalDate
-                expense.setStartedDate(parseToLocalDateTime(line[2], formatter));
-                expense.setCompletedDate(parseToLocalDateTime(line[3], formatter));
-
-                expense.setDescription(line[4]);
-                expense.setAmount(parseBigDecimal(line[5]));
-                expense.setFee(parseBigDecimal(line[6]));
-                expense.setCurrency(line[7]);
-                expense.setState(line[8]);
-                expense.setCategory(ExpenseClassifier.classify(line[4]));
-
-                if (!expenseRepository.existsByStartedDateAndCompletedDate(
-                        expense.getStartedDate(), expense.getCompletedDate())) {
-                    expenseRepository.save(expense);
-                    System.out.println("Expense saved: " + expense);
-                }
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
+            String headerLine = br.readLine(); // read raw header line to detect separator
+            if (headerLine == null) {
+                return Response.status(Response.Status.BAD_REQUEST).entity("CSV file has no header.").build();
             }
 
-            if (expenseRepository.count() > 0) {
-                return Response.ok("CSV file imported successfully.").build();
-            } else {
-                return Response.status(Response.Status.BAD_REQUEST).entity("No expenses found in the CSV file.").build();
+            // detect separator by counting occurrences and choose the one with the highest count
+            int countComma = headerLine.length() - headerLine.replace(",", "").length();
+            int countSemi = headerLine.length() - headerLine.replace(";", "").length();
+            int countTab = headerLine.length() - headerLine.replace("\t", "").length();
+            char separator = ',';
+            int max = Math.max(countComma, Math.max(countSemi, countTab));
+            if (max == countSemi) separator = ';';
+            else if (max == countTab) separator = '\t';
+
+            CSVParser parser = new CSVParserBuilder().withSeparator(separator).build();
+            String[] header = parser.parseLine(headerLine);
+
+            try (CSVReader reader = new CSVReaderBuilder(br).withCSVParser(parser).build()) {
+                Map<String, Integer> idx = mapHeaderToIndex(header);
+
+                String[] line;
+                while ((line = reader.readNext()) != null) {
+                    Expense expense = new Expense();
+
+                    // Helper to get value by canonical name
+                    String type = getValueByIndex(line, idx.get("type"));
+                    String product = getValueByIndex(line, idx.get("product"));
+                    String startedRaw = getValueByIndex(line, idx.get("startedDate"));
+                    String completedRaw = getValueByIndex(line, idx.get("completedDate"));
+                    String description = getValueByIndex(line, idx.get("description"));
+                    String amountRaw = getValueByIndex(line, idx.get("amount"));
+                    String feeRaw = getValueByIndex(line, idx.get("fee"));
+                    String currency = getValueByIndex(line, idx.get("currency"));
+                    String state = getValueByIndex(line, idx.get("state"));
+
+                    expense.setType(type);
+                    expense.setProduct(product);
+
+                    expense.setStartedDate(parseToLocalDateTime(startedRaw));
+                    expense.setCompletedDate(parseToLocalDateTime(completedRaw));
+
+                    expense.setDescription(description);
+                    expense.setAmount(parseBigDecimal(amountRaw));
+                    expense.setFee(parseBigDecimal(feeRaw));
+                    expense.setCurrency(currency);
+                    expense.setState(state);
+                    expense.setCategory(ExpenseClassifier.classify(description));
+
+                    expenseRepository.save(expense);
+                    System.out.println("Expense saved: " + expense);
+
+                }
+
+                if (expenseRepository.count() > 0) {
+                    // Recupero tutte le spese ordinate per startedDate asc e filtro solo quelle con importo negativo
+                    List<Expense> sorted = expenseRepository.findAll(Sort.by(Sort.Direction.ASC, "startedDate"));
+                    List<Expense> negatives = sorted.stream()
+                            .filter(e -> e.getAmount() != null && e.getAmount().compareTo(BigDecimal.ZERO) < 0)
+                            .collect(Collectors.toList());
+                    return Response.ok("Expenses imported").build();
+                } else {
+                    return Response.status(Response.Status.BAD_REQUEST).entity("No expenses found in the CSV file.").build();
+                }
             }
         } catch (DateTimeParseException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("Failed to parse date: " + e.getParsedString()).build();
         }
+
     }
 
-    private LocalDateTime parseToLocalDateTime(String value, DateTimeFormatter formatter) {
+    // Mappa header CSV ai nomi canonici dei campi, usando una lista di sinonimi per ciascun campo
+    private Map<String, Integer> mapHeaderToIndex(String[] header) {
+        Map<String, Integer> indexMap = new HashMap<>();
+        // Canonical keys
+        Map<String, List<String>> synonyms = new HashMap<>();
+        synonyms.put("type", Arrays.asList("Type", "Tipo"));
+        synonyms.put("product", Arrays.asList("Product", "Prodotto", "item", "description_item"));
+        synonyms.put("startedDate", Arrays.asList("started", "started_date", "starteddate", "Data di inizio", "start_date", "Data"));
+        synonyms.put("completedDate", Arrays.asList("completed", "completed_date", "Data di completamento", "data_fine", "end_date", "Data"));
+        synonyms.put("description", Arrays.asList("Description", "Descrizione", "Operazione"));
+        synonyms.put("amount", Arrays.asList("Amount", "Importo", "value", "valore", "totale"));
+        synonyms.put("fee", Arrays.asList("Fee", "tax", "commission"));
+        synonyms.put("currency", Arrays.asList("Currency", "Valuta", "moneta"));
+        synonyms.put("state", Arrays.asList("State", "Stato", "status","Contabilizzazione"));
+
+        for (int i = 0; i < header.length; i++) {
+            String h = header[i].trim().toLowerCase(Locale.ROOT).replaceAll("[\"]", "");
+            for (Map.Entry<String, List<String>> e : synonyms.entrySet()) {
+                for (String syn : e.getValue()) {
+                    if (h.equals(syn.toLowerCase(Locale.ROOT)) || h.contains(syn.toLowerCase(Locale.ROOT))) {
+                        // Se non è già mappato, mappiamo la prima occorrenza
+                        indexMap.putIfAbsent(e.getKey(), i);
+                    }
+                }
+            }
+        }
+        return indexMap;
+    }
+
+    private String getValueByIndex(String[] line, Integer idx) {
+        if (idx == null) return null;
+        if (idx < 0 || idx >= line.length) return null;
+        String v = line[idx];
+        if (v == null) return null;
+        v = v.trim();
+        return v.isEmpty() ? null : v;
+    }
+
+    private LocalDateTime parseToLocalDateTime(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
         }
-        LocalDateTime dateTime = LocalDateTime.parse(value.trim(), formatter);
-        return dateTime;
+        String v = value.trim();
+        // Provo più formati
+        List<String> patterns = Arrays.asList(
+                "yyyy-MM-dd HH:mm:ss",
+                "yyyy-MM-dd'T'HH:mm:ss",
+                "yyyy-MM-dd",
+                "dd/MM/yyyy",
+                "dd/MM/yyyy HH:mm:ss"
+        );
+
+        for (String p : patterns) {
+            try {
+                DateTimeFormatter f = DateTimeFormatter.ofPattern(p);
+                if (p.contains("H") || p.contains("h")) {
+                    return LocalDateTime.parse(v, f);
+                } else {
+                    LocalDate d = LocalDate.parse(v, f);
+                    return d.atStartOfDay();
+                }
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+
+        // Provo come epoch seconds o milliseconds
+        try {
+            long num = Long.parseLong(v);
+            // se ha 13 cifre è millisecondi
+            if (v.length() >= 13) {
+                return LocalDateTime.ofEpochSecond(num / 1000, 0, java.time.ZoneOffset.UTC);
+            } else {
+                return LocalDateTime.ofEpochSecond(num, 0, java.time.ZoneOffset.UTC);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+
+        // Ultimo tentativo: parse con parser ISO (lasciare che l'eccezione salga)
+        return LocalDateTime.parse(v);
     }
 
     private BigDecimal parseBigDecimal(String value) {
         if (value == null || value.trim().isEmpty()) {
             return BigDecimal.ZERO;
         }
-        return new BigDecimal(value.replace(",", "").trim());
+        String v = value.trim();
+        // Rimuovo simboli di valuta e spazi
+        v = v.replaceAll("[€$£¥]", "").trim();
+        v = v.replaceAll("\u00A0", "").trim(); // non-breaking space
+
+        // Se contiene sia '.' che ',', suppongo che '.' sia decimale o ','? Gestisco come thousands separator rimuovendo quello che sembra essere migliaia
+        if (v.contains(",") && v.contains(".")) {
+            // se ultimo separatore è '.' assumo '.' come decimale e rimuovo le virgole
+            int lastComma = v.lastIndexOf(',');
+            int lastDot = v.lastIndexOf('.');
+            if (lastDot > lastComma) {
+                v = v.replaceAll(",", "");
+            } else {
+                v = v.replaceAll("\\.", "");
+                v = v.replaceAll(",", ".");
+            }
+        } else if (v.contains(",") && !v.contains(".")) {
+            // potrebbe essere formato europeo 1.234,56 oppure 1234,56 -> sostituisco la virgola con punto
+            v = v.replaceAll(",", ".");
+        }
+
+        // Rimuovo tutto quello che non è cifra, punto o meno
+        v = v.replaceAll("[^0-9.\\-]", "");
+
+        if (v.isEmpty()) return BigDecimal.ZERO;
+
+        return new BigDecimal(v);
     }
 
     public Response getExpenses() {
         try {
-            Iterable<Expense> expenses = expenseRepository.findAll();
+            Iterable<Expense> expenses = expenseRepository.findAll(Sort.by(Sort.Direction.ASC, "startedDate"))
+                    .stream()
+                    .filter(e -> e.getAmount() != null && e.getAmount().compareTo(BigDecimal.ZERO) < 0)
+                    .collect(Collectors.toList());
+
             if (!expenses.iterator().hasNext()) {
                 return Response.status(Response.Status.NO_CONTENT).entity("No expenses found.").build();
             }
@@ -108,8 +248,11 @@ public class ExpenseImportService {
                         && !e.getStartedDate().isBefore(start)
                         && !e.getCompletedDate().isAfter(end)
                         && e.getStartedDate().isBefore(end)
-                        && e.getCompletedDate().isAfter(start))
+                        && e.getCompletedDate().isAfter(start)
+                        && e.getAmount() != null
+                        && e.getAmount().compareTo(BigDecimal.ZERO) < 0)
                 .toList();
+
 
             if (!expenses.iterator().hasNext()) {
                 return Response.status(Response.Status.NO_CONTENT).entity("No expenses found for the given date range.").build();
@@ -118,9 +261,16 @@ public class ExpenseImportService {
         } catch (DateTimeParseException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("Invalid date format: " + e.getMessage()).build();
         } catch (Exception e) {
-            e.printStackTrace();
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Failed to retrieve expenses: " + e.getMessage()).build();
         }
+    }
+
+    // Aggiungo overload per mantenere vecchio comportamento usato altrove
+    private LocalDateTime parseToLocalDateTime(String value, DateTimeFormatter formatter) {
+        if (value == null || value.trim().isEmpty()) {
+            return null;
+        }
+        return LocalDateTime.parse(value.trim(), formatter);
     }
 
     public Response getExpenseByMonth_Year(String month, String year) {
@@ -146,12 +296,12 @@ public class ExpenseImportService {
         Response res = getExpenseByDate(startDate, endDate);
 
         if (res.getStatus() == Response.Status.OK.getStatusCode()) {
-            Iterable<Expense> expenses = (Iterable<Expense>) res.getEntity();
+            Iterable<?> expensesObj = (Iterable<?>) res.getEntity();
 
             HashMap<String, BigDecimal> monthlyAmount = new HashMap<>();
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-            for (Expense expense : expenses) {
+            for (Object o : expensesObj) {
+                if (!(o instanceof Expense expense)) continue;
                 if (expense.getStartedDate() != null) {
                     if (expense.getAmount().compareTo(BigDecimal.ZERO) > 0) {
                         continue;
