@@ -16,10 +16,12 @@ public class ExpenseController {
     @Autowired
     private ExpenseImportService expenseService;
 
+
     @PostMapping("/import")
-    public ResponseEntity<String> importCsv(@RequestParam("file") MultipartFile file) {
+    public ResponseEntity<String> importCsv(@RequestParam("file") MultipartFile file, @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
-            Response res = expenseService.importExpensesFromCsv(file);
+            String token = authHeader.substring(7);
+            Response res = expenseService.importExpensesFromCsv(file,token);
             if(res.getStatus()==200){
                 return ResponseEntity.ok(res.getEntity().toString());
             } else {
@@ -33,9 +35,10 @@ public class ExpenseController {
 
     @GetMapping("/getExpenses")
     @Produces("application/json")
-    public ResponseEntity<?> getExpenses() {
+    public ResponseEntity<?> getExpenses(@RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
-            Response res = expenseService.getExpenses();
+            String token = authHeader.substring(7);
+            Response res = expenseService.getExpenses(token);
             if(res.getStatus() == 200){
                 return ResponseEntity.ok().body(res.getEntity());
             } else {
@@ -51,13 +54,13 @@ public class ExpenseController {
     @PostMapping("/getExpenseByDate")
     @Consumes("application/json")
     @Produces("application/json")
-    public ResponseEntity<?> getExpenseByDate(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> getExpenseByDate(@RequestBody Map<String, String> body, @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
-
+            String token = authHeader.substring(7);
             String startedDate = body.get("startedDate");
             String completedDate = body.get("completedDate");
 
-            Response res = expenseService.getExpenseByDate(startedDate, completedDate);
+            Response res = expenseService.getExpenseByDate(startedDate, completedDate,token);
             if(res.getStatus() == 200){
                 return ResponseEntity.ok().body(res.getEntity());
             } else {
@@ -73,11 +76,12 @@ public class ExpenseController {
     @PostMapping("/getExpenseByMonth")
     @Consumes("application/json")
     @Produces("application/json")
-    public ResponseEntity<?> getExpenseByMonth_Year(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> getExpenseByMonth_Year(@RequestBody Map<String, String> body, @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
+            String token = authHeader.substring(7);
             String month = body.get("month");
             String year = body.get("year");
-            Response res = expenseService.getExpenseByMonth_Year(month, year);
+            Response res = expenseService.getExpenseByMonth_Year(month, year, token);
             if(res.getStatus() == 200){
                 return ResponseEntity.ok().body(res.getEntity());
             } else {
@@ -93,10 +97,11 @@ public class ExpenseController {
     @PostMapping("/getMonthlyAmountOfYear")
     @Consumes("application/json")
     @Produces("application/json")
-    public ResponseEntity<?> getMonthly_Amount_of_Year(@RequestBody Map<String, String> body) {
+    public ResponseEntity<?> getMonthly_Amount_of_Year(@RequestBody Map<String, String> body, @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
+            String token = authHeader.substring(7);
             String year = body.get("year");
-            Response res = expenseService.getMonthly_Amount_of_Year(year);
+            Response res = expenseService.getMonthly_Amount_of_Year(year, token);
             if(res.getStatus() == 200){
                 return ResponseEntity.ok().body(res.getEntity());
             } else {

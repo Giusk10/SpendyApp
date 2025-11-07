@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
@@ -28,8 +29,13 @@ public class ExpenseImportService {
 
     @Autowired
     private IExpenseRepository expenseRepository;
+    private final WebClient webClient;
 
-    public Response importExpensesFromCsv(MultipartFile file) throws Exception {
+    public ExpenseImportService(WebClient webClient) {
+        this.webClient = webClient;
+    }
+
+    public Response importExpensesFromCsv(MultipartFile file, String token) throws Exception {
         if (file.isEmpty()) {
             return Response.status(Response.Status.NO_CONTENT).entity("CSV file is empty.").build();
         }
@@ -82,6 +88,9 @@ public class ExpenseImportService {
                     expense.setCurrency(currency);
                     expense.setState(state);
                     expense.setCategory(ExpenseClassifier.classify(description));
+
+                    String username = getUsernameFromTokenViaRest(token);
+                    expense.setUsername(username);
 
                     expenseRepository.save(expense);
                     System.out.println("Expense saved: " + expense);
@@ -219,11 +228,12 @@ public class ExpenseImportService {
         return new BigDecimal(v);
     }
 
-    public Response getExpenses() {
+    public Response getExpenses(String token) {
         try {
+            String username = getUsernameFromTokenViaRest(token);
             Iterable<Expense> expenses = expenseRepository.findAll(Sort.by(Sort.Direction.ASC, "startedDate"))
                     .stream()
-                    .filter(e -> e.getAmount() != null && e.getAmount().compareTo(BigDecimal.ZERO) < 0)
+                    .filter(e -> e.getAmount() != null && e.getAmount().compareTo(BigDecimal.ZERO) < 0 && e.getUsername().equals(username))
                     .collect(Collectors.toList());
 
             if (!expenses.iterator().hasNext()) {
@@ -236,7 +246,9 @@ public class ExpenseImportService {
     }
 
 
-    public Response getExpenseByDate(String startedDate, String endDate) {
+    public Response getExpenseByDate(String startedDate, String endDate, String token) {
+
+        String username = getUsernameFromTokenViaRest(token);
 
         try {
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
@@ -244,13 +256,15 @@ public class ExpenseImportService {
             LocalDateTime end = parseToLocalDateTime(endDate, formatter);
 
             Iterable<Expense> expenses = expenseRepository.findAll().stream()
-                .filter(e -> e.getStartedDate() != null && e.getCompletedDate() != null
+                .filter(e -> e.getStartedDate() != null
+                        && e.getCompletedDate() != null
                         && !e.getStartedDate().isBefore(start)
                         && !e.getCompletedDate().isAfter(end)
                         && e.getStartedDate().isBefore(end)
                         && e.getCompletedDate().isAfter(start)
                         && e.getAmount() != null
                         && e.getAmount().compareTo(BigDecimal.ZERO) < 0)
+                .filter(e -> e.getUsername().equals(username))
                 .toList();
 
 
@@ -273,12 +287,12 @@ public class ExpenseImportService {
         return LocalDateTime.parse(value.trim(), formatter);
     }
 
-    public Response getExpenseByMonth_Year(String month, String year) {
+    public Response getExpenseByMonth_Year(String month, String year, String token) {
 
         String startDate = year + "-" + month + "-01 00:00:00";
         String endDate = year + "-" + month + "-31 23:59:59";
 
-        Response res = getExpenseByDate(startDate, endDate);
+        Response res = getExpenseByDate(startDate, endDate, token);
 
         if (res.getStatus() == Response.Status.OK.getStatusCode()) {
             return Response.ok(res.getEntity()).build();
@@ -289,11 +303,11 @@ public class ExpenseImportService {
 
 
 
-    public Response getMonthly_Amount_of_Year(String year) {
+    public Response getMonthly_Amount_of_Year(String year , String token) {
         String startDate = year + "-01-01 00:00:00";
         String endDate = year + "-12-31 23:59:59";
 
-        Response res = getExpenseByDate(startDate, endDate);
+        Response res = getExpenseByDate(startDate, endDate, token);
 
         if (res.getStatus() == Response.Status.OK.getStatusCode()) {
             Iterable<?> expensesObj = (Iterable<?>) res.getEntity();
@@ -318,6 +332,22 @@ public class ExpenseImportService {
         }
         else {
             return Response.status(res.getStatus()).entity(res.getEntity()).build();
+        }
+    }
+
+    private String getUsernameFromTokenViaRest(String token) {
+        try {
+            Map<String, String> response = webClient.post()
+                    .uri("http://localhost:8080/gateway/verify-token")
+                    .bodyValue(Map.of("token", token))
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+
+            // La risposta JSON dovrebbe essere tipo {"username": "theUser"}
+            return response != null ? response.get("username") : null;
+        } catch (Exception e) {
+            return null;
         }
     }
 }

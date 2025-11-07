@@ -44,6 +44,9 @@ public class Expense {
     @Field("category")
     private String category;
 
+    @Field("username")
+    private String username;
+
     // Getters & Setters
     public String getId() {
         return id;
@@ -129,6 +132,13 @@ public class Expense {
         this.category = category;
     }
 
+    public String getUsername() {
+        return username;
+    }
+    public void setUsername(String userId) {
+        this.username = userId;
+    }
+
     @Override
     public String toString() {
         return "Expense{" +
@@ -143,6 +153,7 @@ public class Expense {
                 ", currency='" + currency + '\'' +
                 ", state='" + state + '\'' +
                 ", category='" + category + '\'' +
+                ", username='" + username + '\'' +
                 '}';
     }
 }
