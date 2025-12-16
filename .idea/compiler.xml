@@ -6,9 +6,10 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="AuthMicroService" />
         <module name="ExpenseMicroService" />
+        <module name="AuthMicroService" />
         <module name="gateway" />
+        <module name="Gateway" />
       </profile>
     </annotationProcessing>
   </component>
@@ -16,6 +17,7 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="AuthMicroService" options="-parameters" />
       <module name="ExpenseMicroService" options="-parameters" />
+      <module name="Gateway" options="-parameters" />
       <module name="gateway" options="-parameters" />
     </option>
   </component>
