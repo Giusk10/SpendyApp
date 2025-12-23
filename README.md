@@ -2,7 +2,7 @@
 
 SpendyApp è un'applicazione a microservizi per la gestione delle spese condivise tra coinquilini. Permette di registrare utenti, gestire gruppi (case), tracciare le spese e calcolare i conguagli.
 
-## Architecture uD83C\uDFD7️
+## Architecture 
 
 Il progetto è basato su **Spring Boot** e segue un'architettura a microservizi orchestrata da un API Gateway.
 
