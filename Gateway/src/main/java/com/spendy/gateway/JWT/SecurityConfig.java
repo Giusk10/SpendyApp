@@ -29,8 +29,10 @@ public class SecurityConfig {
                 }))
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.POST, "/gateway/generate-token").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/gateway/verify-token").permitAll()
+                        .pathMatchers("/Auth/**").permitAll()
                         .pathMatchers("/Expense/**").authenticated()
-                        .anyExchange().permitAll()
+                        .anyExchange().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, SecurityWebFiltersOrder.AUTHENTICATION)
                 .build();

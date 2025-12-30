@@ -1,6 +1,6 @@
 # Default ignored files
 /shelf/
-/.idea/
+.idea/
 # Editor-based HTTP Client requests
 /httpRequests/
 # Environment-dependent path to Maven home directory
