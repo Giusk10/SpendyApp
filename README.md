@@ -80,4 +80,4 @@ Il progetto è composto da più moduli. È necessario avviare prima il Gateway e
 
 ## License 📄
 
-Distribuito sotto la licenza MIT. Vedi il file `LICENSE` per maggiori informazioni.
+Distribuito sotto la licenza AGPLv3. Vedi il file `LICENSE` per maggiori informazioni.
