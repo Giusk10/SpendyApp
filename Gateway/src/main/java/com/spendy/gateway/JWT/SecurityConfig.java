@@ -22,12 +22,15 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(exchange -> {
                     org.springframework.web.cors.CorsConfiguration config = new org.springframework.web.cors.CorsConfiguration();
                     config.addAllowedOrigin("http://localhost:5173");
+                    config.addAllowedOrigin("http://100.117.226.152:5173");
+                    config.addAllowedOrigin("http://100.115.146.177:5173");
                     config.addAllowedMethod("*");
                     config.addAllowedHeader("*");
                     config.setAllowCredentials(true);
                     return config;
                 }))
                 .authorizeExchange(exchange -> exchange
+                        .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers(HttpMethod.POST, "/gateway/generate-token").permitAll()
                         .pathMatchers(HttpMethod.POST, "/gateway/verify-token").permitAll()
                         .pathMatchers("/Auth/**").permitAll()

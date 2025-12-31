@@ -12,6 +12,8 @@ public class CorsGlobalConfiguration {
     public CorsFilter corsFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
         corsConfig.addAllowedOrigin("http://localhost:5173");
+        corsConfig.addAllowedOrigin("http://100.117.226.152:5173");
+        corsConfig.addAllowedOrigin("http://100.115.146.177:5173");
         corsConfig.addAllowedMethod("*");
         corsConfig.addAllowedHeader("*");
         corsConfig.setAllowCredentials(true);
