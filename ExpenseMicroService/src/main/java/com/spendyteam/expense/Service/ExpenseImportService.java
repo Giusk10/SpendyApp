@@ -19,6 +19,7 @@ import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -29,9 +30,9 @@ public class ExpenseImportService {
 
     @Autowired
     private IExpenseRepository expenseRepository;
-    private final WebClient webClient;
+    private WebClient webClient = null;
 
-    public ExpenseImportService(WebClient webClient) {
+    public ExpenseImportService() {
         this.webClient = webClient;
     }
 
@@ -157,6 +158,12 @@ public class ExpenseImportService {
             return null;
         }
         String v = value.trim();
+
+        try {
+            return java.time.ZonedDateTime.parse(v).toLocalDateTime();
+        } catch (DateTimeParseException ignored) {
+        }
+
         // Provo più formati
         List<String> patterns = Arrays.asList(
                 "yyyy-MM-dd HH:mm:ss",
@@ -184,9 +191,9 @@ public class ExpenseImportService {
             long num = Long.parseLong(v);
             // se ha 13 cifre è millisecondi
             if (v.length() >= 13) {
-                return LocalDateTime.ofEpochSecond(num / 1000, 0, java.time.ZoneOffset.UTC);
+                return LocalDateTime.ofEpochSecond(num / 1000, 0, ZoneOffset.UTC);
             } else {
-                return LocalDateTime.ofEpochSecond(num, 0, java.time.ZoneOffset.UTC);
+                return LocalDateTime.ofEpochSecond(num, 0, ZoneOffset.UTC);
             }
         } catch (NumberFormatException ignored) {
         }
@@ -348,6 +355,47 @@ public class ExpenseImportService {
             return response != null ? response.get("username") : null;
         } catch (Exception e) {
             return null;
+        }
+    }
+
+    public Response deleteExpense(String expenseId) {
+        try {
+            Optional<Expense> expenseOpt = expenseRepository.findById(expenseId);
+            if (expenseOpt.isPresent()) {
+                expenseRepository.deleteById(expenseId);
+                return Response.status(Response.Status.OK).entity("Expense deleted successfully.").build();
+
+            } else {
+                return Response.status(Response.Status.NOT_FOUND).entity("Expense not found.").build();
+            }
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Failed to delete expense: " + e.getMessage()).build();
+        }
+    }
+
+    public Response addExpense(Map<String, String> body, String token) {
+        try {
+            Expense expense = new Expense();
+
+            expense.setType(body.get("type"));
+            expense.setProduct(body.get("product"));
+            expense.setStartedDate(parseToLocalDateTime(body.get("startedDate")));
+            expense.setCompletedDate(parseToLocalDateTime(body.get("completedDate")));
+            expense.setDescription(body.get("description"));
+            expense.setAmount(parseBigDecimal(body.get("amount")));
+            expense.setFee(parseBigDecimal(body.get("fee")));
+            expense.setCurrency(body.get("currency"));
+            expense.setState(body.get("state"));
+            expense.setCategory(ExpenseClassifier.classify(body.get("description")));
+            expense.setCategory(ExpenseClassifier.classify(body.get("description")));
+
+            String username = getUsernameFromTokenViaRest(token);
+            expense.setUsername(username);
+
+            expenseRepository.save(expense);
+            return Response.status(Response.Status.OK).entity("Expense added successfully.").build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Failed to add expense: " + e.getMessage()).build();
         }
     }
 }

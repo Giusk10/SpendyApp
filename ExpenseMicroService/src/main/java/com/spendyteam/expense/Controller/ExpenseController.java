@@ -114,6 +114,36 @@ public class ExpenseController {
         }
     }
 
+    @DeleteMapping("/deleteExpense")
+    public ResponseEntity<String> deleteExpense(@RequestBody Map<String, String> body) {
+        try {
+            String expenseId = body.get("expenseId");
+            Response res = expenseService.deleteExpense(expenseId);
+            if(res.getStatus() == 200){
+                return ResponseEntity.ok(res.getEntity().toString());
+            } else {
+                return ResponseEntity.status(res.getStatus()).body(res.getEntity().toString());
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to delete expense: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/addExpense")
+    public ResponseEntity<String> addExpense(@RequestBody Map<String, String> body, @RequestHeader (value = "Authorization", required = false) String authHeader) {
+        try {
+            String token = authHeader.substring(7);
+            Response res = expenseService.addExpense(body, token);
+            if(res.getStatus() == 200){
+                return ResponseEntity.ok(res.getEntity().toString());
+            } else {
+                return ResponseEntity.status(res.getStatus()).body(res.getEntity().toString());
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to add expense: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/test" )
     public ResponseEntity<String> testEndpoint() {
         return ResponseEntity.ok("Expense Microservice is up and running!");
