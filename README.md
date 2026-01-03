@@ -26,53 +26,7 @@ Il progetto è basato su **Spring Boot** e segue un'architettura a microservizi 
 * **Gestione Spese**: CRUD completo delle spese.
 * **Smart Import**: Importazione spese da file CSV con riconoscimento automatico del separatore.
 * **Auto-Categorizzazione**: Classificazione automatica delle spese basata su parole chiave (es. "Netflix" -> "Abbonamenti", "Uber" -> "Trasporti").
-* **Gestione Coinquilini**: Associazione utenti a una casa specifica tramite `houseId`.
 
-## Getting Started 🚀
-
-### Prerequisiti
-* Java JDK 21 installato.
-* MongoDB in esecuzione (locale o Atlas).
-
-### Configurazione Variabili d'Ambiente
-Per motivi di sicurezza, il progetto richiede la configurazione delle seguenti variabili d'ambiente (o la modifica dei file `application.properties` per uso locale):
-
-* `MONGODB_URI`: La stringa di connessione al tuo database MongoDB.
-* `JWT_SECRET`: La chiave segreta per la firma dei token.
-
-### Installazione e Avvio
-
-Il progetto è composto da più moduli. È necessario avviare prima il Gateway e poi i singoli servizi.
-
-1.  **Clona il repository:**
-    ```bash
-    git clone [https://github.com/tuo-username/SpendyApp.git](https://github.com/tuo-username/SpendyApp.git)
-    cd SpendyApp
-    ```
-
-2.  **Avvia il Gateway:**
-    ```bash
-    cd Gateway
-    ./mvnw spring-boot:run
-    ```
-
-3.  **Avvia Auth Service:**
-    ```bash
-    cd ../AuthMicroService
-    ./mvnw spring-boot:run
-    ```
-
-4.  **Avvia Expense Service:**
-    ```bash
-    cd ../ExpenseMicroService
-    ./mvnw spring-boot:run
-    ```
-
-## API Endpoints (Esempi) 📡
-
-### Auth
-* `POST /auth/register`: Registra un nuovo utente.
-* `POST /auth/login`: Effettua il login e ricevi il token Bearer.
 
 ### Expenses
 * `POST /rest/expense/import`: Carica un file CSV per importare le spese (Richiede Header `Authorization: Bearer <token>`).
