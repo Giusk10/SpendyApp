@@ -115,14 +115,15 @@ public class ExpenseController {
     }
 
     @DeleteMapping("/deleteExpense")
-    public ResponseEntity<String> deleteExpense(@RequestBody Map<String, String> body) {
+    public ResponseEntity<Object> deleteExpense(@RequestBody Map<String, String> body, @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
-            String expenseId = body.get("expenseId");
-            Response res = expenseService.deleteExpense(expenseId);
+            String token = authHeader.substring(7);
+            System.out.println(token);
+            Response res = expenseService.deleteExpense(body.get("expenseId"), token);
             if(res.getStatus() == 200){
-                return ResponseEntity.ok(res.getEntity().toString());
+                return ResponseEntity.ok(res.getEntity());
             } else {
-                return ResponseEntity.status(res.getStatus()).body(res.getEntity().toString());
+                return ResponseEntity.status(res.getStatus()).body(res.getEntity());
             }
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Failed to delete expense: " + e.getMessage());
@@ -130,12 +131,13 @@ public class ExpenseController {
     }
 
     @PostMapping("/addExpense")
-    public ResponseEntity<String> addExpense(@RequestBody Map<String, String> body, @RequestHeader (value = "Authorization", required = false) String authHeader) {
+    @Produces("application/json")
+    public ResponseEntity<Object> addExpense(@RequestBody Map<String, String> body, @RequestHeader (value = "Authorization", required = false) String authHeader) {
         try {
             String token = authHeader.substring(7);
             Response res = expenseService.addExpense(body, token);
-            if(res.getStatus() == 200){
-                return ResponseEntity.ok(res.getEntity().toString());
+            if(res.getStatus() == 201){
+                return ResponseEntity.created(null).body(res.getEntity());
             } else {
                 return ResponseEntity.status(res.getStatus()).body(res.getEntity().toString());
             }
