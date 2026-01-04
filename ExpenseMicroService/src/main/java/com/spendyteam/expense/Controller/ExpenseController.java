@@ -118,7 +118,6 @@ public class ExpenseController {
     public ResponseEntity<Object> deleteExpense(@RequestBody Map<String, String> body, @RequestHeader(value = "Authorization", required = false) String authHeader) {
         try {
             String token = authHeader.substring(7);
-            System.out.println(token);
             Response res = expenseService.deleteExpense(body.get("expenseId"), token);
             if(res.getStatus() == 200){
                 return ResponseEntity.ok(res.getEntity());

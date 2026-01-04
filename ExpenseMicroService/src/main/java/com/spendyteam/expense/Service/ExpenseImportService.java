@@ -94,7 +94,6 @@ public class ExpenseImportService {
                     expense.setUsername(username);
 
                     expenseRepository.save(expense);
-                    System.out.println("Expense saved: " + expense);
 
                 }
 
@@ -354,7 +353,6 @@ public class ExpenseImportService {
     public Response deleteExpense(String expenseId, String token) {
         try {
             String username = getUsernameFromTokenViaRest(token);
-            System.out.println(username);
             if (username == null) {
                 return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token.").build();
             }
