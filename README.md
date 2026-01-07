@@ -7,9 +7,9 @@ SpendyApp è un'applicazione a microservizi per la gestione delle spese condivis
 Il progetto è basato su **Spring Boot** e segue un'architettura a microservizi orchestrata da un API Gateway.
 
 ### Moduli Principali
-* **Gateway** (Porta 8080): Punto di ingresso unico. Gestisce il routing delle richieste e la sicurezza tramite filtri JWT.
-* **AuthMicroService** (Porta 8081): Gestisce la registrazione utenti, il login e l'emissione dei token JWT.
-* **ExpenseMicroService** (Porta 8084): Gestisce la logica delle spese, inclusa l'importazione da CSV e la categorizzazione automatica (es. "Ristorazione", "Trasporti").
+* **Gateway** : Punto di ingresso unico. Gestisce il routing delle richieste e la sicurezza tramite filtri JWT.
+* **AuthMicroService** : Gestisce la registrazione utenti, il login e l'emissione dei token JWT.
+* **ExpenseMicroService** : Gestisce la logica delle spese, inclusa l'importazione da CSV e la categorizzazione automatica (es. "Ristorazione", "Trasporti").
 * **Database**: Ogni microservizio utilizza **MongoDB** per la persistenza dei dati.
 
 ## Tech Stack 🛠️
