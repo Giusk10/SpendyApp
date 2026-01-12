@@ -7,7 +7,7 @@ import reactor.core.publisher.Mono;
 @RestController
 public class RootController {
 
-    @GetMapping("/")
+    @GetMapping("/root")
     public Mono<String> home() {
         return Mono.just("🟢 Spendy Gateway è attivo e funzionante!");
     }
