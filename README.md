@@ -1,3 +1,14 @@
+---
+title: Spendy
+emoji: 🏆
+colorFrom: green
+colorTo: pink
+sdk: docker
+pinned: false
+license: agpl-3.0
+app_port: 7860
+---
+
 # SpendyApp 🏠💸
 
 SpendyApp è un'applicazione a microservizi per la gestione delle spese condivise tra coinquilini. Permette di registrare utenti, gestire gruppi (case), tracciare le spese e calcolare i conguagli.
@@ -26,11 +37,6 @@ Il progetto è basato su **Spring Boot** e segue un'architettura a microservizi 
 * **Gestione Spese**: CRUD completo delle spese.
 * **Smart Import**: Importazione spese da file CSV con riconoscimento automatico del separatore.
 * **Auto-Categorizzazione**: Classificazione automatica delle spese basata su parole chiave (es. "Netflix" -> "Abbonamenti", "Uber" -> "Trasporti").
-
-
-### Expenses
-* `POST /rest/expense/import`: Carica un file CSV per importare le spese (Richiede Header `Authorization: Bearer <token>`).
-* `GET /rest/expense/getExpenses`: Ottieni la lista delle spese dell'utente.
 
 ## License 📄
 

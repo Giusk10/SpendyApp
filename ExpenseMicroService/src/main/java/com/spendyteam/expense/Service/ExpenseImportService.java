@@ -30,10 +30,10 @@ public class ExpenseImportService {
 
     @Autowired
     private IExpenseRepository expenseRepository;
-    private WebClient webClient = null;
+    private WebClient webClient;
 
     public ExpenseImportService() {
-        this.webClient = webClient;
+        this.webClient = WebClient.builder().build();
     }
 
     public Response importExpensesFromCsv(MultipartFile file, String token) throws Exception {
@@ -94,7 +94,6 @@ public class ExpenseImportService {
                     expense.setUsername(username);
 
                     expenseRepository.save(expense);
-                    System.out.println("Expense saved: " + expense);
 
                 }
 
@@ -240,7 +239,7 @@ public class ExpenseImportService {
             String username = getUsernameFromTokenViaRest(token);
             Iterable<Expense> expenses = expenseRepository.findAll(Sort.by(Sort.Direction.ASC, "startedDate"))
                     .stream()
-                    .filter(e -> e.getAmount() != null && e.getAmount().compareTo(BigDecimal.ZERO) < 0 && e.getUsername().equals(username))
+                    .filter(e -> e.getAmount() != null && e.getAmount().compareTo(BigDecimal.ZERO) < 0 && username != null && username.equals(e.getUsername()))
                     .collect(Collectors.toList());
 
             if (!expenses.iterator().hasNext()) {
@@ -258,9 +257,8 @@ public class ExpenseImportService {
         String username = getUsernameFromTokenViaRest(token);
 
         try {
-            DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-            LocalDateTime start = parseToLocalDateTime(startedDate, formatter);
-            LocalDateTime end = parseToLocalDateTime(endDate, formatter);
+            LocalDateTime start = parseToLocalDateTime(startedDate);
+            LocalDateTime end = parseToLocalDateTime(endDate);
 
             Iterable<Expense> expenses = expenseRepository.findAll().stream()
                 .filter(e -> e.getStartedDate() != null
@@ -271,7 +269,7 @@ public class ExpenseImportService {
                         && e.getCompletedDate().isAfter(start)
                         && e.getAmount() != null
                         && e.getAmount().compareTo(BigDecimal.ZERO) < 0)
-                .filter(e -> e.getUsername().equals(username))
+                .filter(e -> username != null && username.equals(e.getUsername()))
                 .toList();
 
 
@@ -286,13 +284,7 @@ public class ExpenseImportService {
         }
     }
 
-    // Aggiungo overload per mantenere vecchio comportamento usato altrove
-    private LocalDateTime parseToLocalDateTime(String value, DateTimeFormatter formatter) {
-        if (value == null || value.trim().isEmpty()) {
-            return null;
-        }
-        return LocalDateTime.parse(value.trim(), formatter);
-    }
+
 
     public Response getExpenseByMonth_Year(String month, String year, String token) {
 
@@ -358,10 +350,20 @@ public class ExpenseImportService {
         }
     }
 
-    public Response deleteExpense(String expenseId) {
+    public Response deleteExpense(String expenseId, String token) {
         try {
+            String username = getUsernameFromTokenViaRest(token);
+            if (username == null) {
+                return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token.").build();
+            }
+
             Optional<Expense> expenseOpt = expenseRepository.findById(expenseId);
             if (expenseOpt.isPresent()) {
+                Expense expense = expenseOpt.get();
+                // Verifica che l'utente sia il proprietario della spesa
+                if (!username.equals(expense.getUsername())) {
+                    return Response.status(Response.Status.FORBIDDEN).entity("You are not authorized to delete this expense.").build();
+                }
                 expenseRepository.deleteById(expenseId);
                 return Response.status(Response.Status.OK).entity("Expense deleted successfully.").build();
 
@@ -387,13 +389,12 @@ public class ExpenseImportService {
             expense.setCurrency(body.get("currency"));
             expense.setState(body.get("state"));
             expense.setCategory(ExpenseClassifier.classify(body.get("description")));
-            expense.setCategory(ExpenseClassifier.classify(body.get("description")));
 
             String username = getUsernameFromTokenViaRest(token);
             expense.setUsername(username);
 
             expenseRepository.save(expense);
-            return Response.status(Response.Status.OK).entity("Expense added successfully.").build();
+            return Response.status(Response.Status.CREATED).entity(expense).build();
         } catch (Exception e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Failed to add expense: " + e.getMessage()).build();
         }

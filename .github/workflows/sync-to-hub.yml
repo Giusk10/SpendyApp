@@ -1,0 +1,26 @@
+name: Sync to Hugging Face hub
+on:
+  push:
+    branches: [main]  # O "master", controlla come si chiama il tuo branch principale
+
+  # Permette di lanciare il deploy anche manualmente dal tab Actions
+  workflow_dispatch:
+
+jobs:
+  sync-to-hub:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Importante per scaricare tutta la history git
+          lfs: true      # Abilita LFS se hai file grandi (opzionale ma consigliato)
+
+      - name: Push to hub
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          # Sostituisci qui sotto con il TUO username HF e il nome del TUO Space
+          HF_USERNAME: Khondor03
+          SPACE_NAME: Spendy
+        run: |
+          git push https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$SPACE_NAME main
