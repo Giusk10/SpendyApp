@@ -17,5 +17,5 @@ sleep 15
 
 # 4. Avvia Gateway Service in foreground (Mantiene vivo il container)
 # Nota: Il gateway userà la porta 7860 grazie alla variabile d'ambiente
-echo "--> Avvio Gateway Service (Porta 8080)..."
-java -Dserver.port=8080 -jar /app/gateway-service.jar
+echo "--> Avvio Gateway Service (Porta 7860)..."
+java -Dserver.port=7860 -jar /app/gateway-service.jar
