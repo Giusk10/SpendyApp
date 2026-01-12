@@ -6,15 +6,15 @@ WORKDIR /app
 COPY . .
 
 # Compila Auth Service
-WORKDIR /app/auth-service
+WORKDIR /app/AuthMicroService
 RUN mvn clean package -DskipTests
 
 # Compila Expense Service
-WORKDIR /app/expense-service
+WORKDIR /app/ExpenseMicroService
 RUN mvn clean package -DskipTests
 
 # Compila Gateway Service
-WORKDIR /app/gateway-service
+WORKDIR /app/Gateway
 RUN mvn clean package -DskipTests
 
 # --- FASE 2: Esecuzione (Immagine finale leggera) ---
@@ -25,9 +25,9 @@ WORKDIR /app
 RUN apk add --no-cache bash
 
 # Copia i JAR compilati dalla fase precedente
-COPY --from=build /app/auth-service/target/*.jar /app/auth-service.jar
-COPY --from=build /app/expense-service/target/*.jar /app/expense-service.jar
-COPY --from=build /app/gateway-service/target/*.jar /app/gateway-service.jar
+COPY --from=build /app/AuthMicroService/target/*.jar /app/auth-service.jar
+COPY --from=build /app/ExpenseMicroService/target/*.jar /app/expense-service.jar
+COPY --from=build /app/Gateway/target/*.jar /app/gateway-service.jar
 
 # Copia lo script di avvio e rendilo eseguibile
 COPY entrypoint.sh /app/entrypoint.sh
