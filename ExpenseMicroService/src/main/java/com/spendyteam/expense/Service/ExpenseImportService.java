@@ -337,7 +337,7 @@ public class ExpenseImportService {
     private String getUsernameFromTokenViaRest(String token) {
         try {
             Map<String, String> response = webClient.post()
-                    .uri("http://gateway-service:8080/gateway/verify-token")
+                    .uri("http://localhost:8080/gateway/verify-token")
                     .bodyValue(Map.of("token", token))
                     .retrieve()
                     .bodyToMono(Map.class)
