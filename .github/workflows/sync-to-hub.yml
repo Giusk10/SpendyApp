@@ -23,4 +23,4 @@ jobs:
           HF_USERNAME: Khondor03
           SPACE_NAME: Spendy
         run: |
-          git push https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$SPACE_NAME main
+          git push --force https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$SPACE_NAME main
