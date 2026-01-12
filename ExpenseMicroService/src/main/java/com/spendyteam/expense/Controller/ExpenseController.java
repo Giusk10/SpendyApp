@@ -129,6 +129,23 @@ public class ExpenseController {
         }
     }
 
+    @DeleteMapping("/deleteAllExpenses")
+    @Produces("application/json")
+    public ResponseEntity<Object> deleteAllExpenses(@RequestHeader(value = "Authorization", required = false) String authHeader) {
+
+        try {
+            String token = authHeader.substring(7);
+            Response res = expenseService.deleteAllExpenses(token);
+            if(res.getStatus() == 200){
+                return ResponseEntity.ok(res.getEntity());
+            } else {
+                return ResponseEntity.status(res.getStatus()).body(res.getEntity());
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to delete all expenses: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/addExpense")
     @Produces("application/json")
     public ResponseEntity<Object> addExpense(@RequestBody Map<String, String> body, @RequestHeader (value = "Authorization", required = false) String authHeader) {

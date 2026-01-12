@@ -16,4 +16,5 @@ public interface IExpenseRepository extends MongoRepository<Expense, String> {
 
     boolean existsByDescriptionAndAmount(String description, BigDecimal amount);
 
+    List<Expense> findByUsername(String username);
 }

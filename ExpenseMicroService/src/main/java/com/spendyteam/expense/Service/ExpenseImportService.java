@@ -25,6 +25,7 @@ import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.concurrent.Executors; // Importante per i Virtual Threads
 import java.util.stream.Collectors;
+import java.util.List;
 
 @Service
 public class ExpenseImportService {
@@ -410,6 +411,54 @@ public class ExpenseImportService {
             return Response.status(Response.Status.CREATED).entity(expense).build();
         } catch (Exception e) {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Failed to add expense: " + e.getMessage()).build();
+        }
+    }
+
+
+    public Response deleteAllExpenses(String token) {
+        try {
+            String username = getUsernameFromTokenViaRest(token);
+            if (username == null) {
+                return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token.").build();
+            }
+
+            // 1. Fetch Intelligente: Prendi SOLO le spese di questo utente
+            // Nota: Assicurati che il tuo Repository abbia questo metodo (vedi sotto)
+            List<Expense> userExpenses = expenseRepository.findByUsername(username);
+
+            if (userExpenses.isEmpty()) {
+                return Response.status(Response.Status.OK).entity("No expenses found for user: " + username).build();
+            }
+
+            // 2. Definizione Batch
+            int batchSize = 1000; // Cancelliamo 1000 spese per volta per thread
+
+            // 3. Virtual Threads "On Fire" 🔥
+            try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+
+                // Dividiamo la lista in blocchi (Batching)
+                for (int i = 0; i < userExpenses.size(); i += batchSize) {
+                    int start = i;
+                    int end = Math.min(i + batchSize, userExpenses.size());
+
+                    // Creiamo una sub-list (copia leggera)
+                    List<Expense> batch = userExpenses.subList(start, end);
+
+                    // Lanciamo il thread virtuale per cancellare questo blocco
+                    executor.submit(() -> {
+                        try {
+                            expenseRepository.deleteAll(batch);
+                        } catch (Exception e) {
+                            System.err.println("Errore cancellazione batch: " + e.getMessage());
+                        }
+                    });
+                }
+            } // Il try-with-resources aspetta automaticamente che TUTTI i blocchi siano cancellati
+
+            return Response.status(Response.Status.OK).entity("All expenses deleted successfully for user: " + username).build();
+
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Failed to delete all expenses: " + e.getMessage()).build();
         }
     }
 }
