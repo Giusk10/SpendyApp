@@ -431,7 +431,7 @@ public class ExpenseImportService {
             }
 
             // 2. Definizione Batch
-            int batchSize = userExpenses.size()/20; // Cancelliamo 1000 spese per volta per thread
+            int batchSize = userExpenses.size()/50; // Cancelliamo 1000 spese per volta per thread
 
             // 3. Virtual Threads "On Fire" 🔥
             try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
