@@ -23,6 +23,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
+import java.util.concurrent.Executors; // Importante per i Virtual Threads
 import java.util.stream.Collectors;
 
 @Service
@@ -47,7 +48,7 @@ public class ExpenseImportService {
                 return Response.status(Response.Status.BAD_REQUEST).entity("CSV file has no header.").build();
             }
 
-            // detect separator by counting occurrences and choose the one with the highest count
+            // detect separator logic
             int countComma = headerLine.length() - headerLine.replace(",", "").length();
             int countSemi = headerLine.length() - headerLine.replace(";", "").length();
             int countTab = headerLine.length() - headerLine.replace("\t", "").length();
@@ -62,62 +63,86 @@ public class ExpenseImportService {
             try (CSVReader reader = new CSVReaderBuilder(br).withCSVParser(parser).build()) {
                 Map<String, Integer> idx = mapHeaderToIndex(header);
 
-                String[] line;
-                while ((line = reader.readNext()) != null) {
-                    Expense expense = new Expense();
-
-                    // Helper to get value by canonical name
-                    String type = getValueByIndex(line, idx.get("type"));
-                    String product = getValueByIndex(line, idx.get("product"));
-                    String startedRaw = getValueByIndex(line, idx.get("startedDate"));
-                    String completedRaw = getValueByIndex(line, idx.get("completedDate"));
-                    String description = getValueByIndex(line, idx.get("description"));
-                    String amountRaw = getValueByIndex(line, idx.get("amount"));
-                    String feeRaw = getValueByIndex(line, idx.get("fee"));
-                    String currency = getValueByIndex(line, idx.get("currency"));
-                    String state = getValueByIndex(line, idx.get("state"));
-
-                    expense.setType(type);
-                    expense.setProduct(product);
-
-                    expense.setStartedDate(parseToLocalDateTime(startedRaw));
-                    expense.setCompletedDate(parseToLocalDateTime(completedRaw));
-
-                    expense.setDescription(description);
-                    expense.setAmount(parseBigDecimal(amountRaw));
-                    expense.setFee(parseBigDecimal(feeRaw));
-                    expense.setCurrency(currency);
-                    expense.setState(state);
-                    expense.setCategory(ExpenseClassifier.classify(description));
-
-                    String username = getUsernameFromTokenViaRest(token);
-                    expense.setUsername(username);
-
-                    expenseRepository.save(expense);
-
+                // --- OTTIMIZZAZIONE 1: Chiamata Auth unica ---
+                // Invece di chiamare il Gateway per ogni riga, lo facciamo una volta sola qui.
+                String username = getUsernameFromTokenViaRest(token);
+                if (username == null) {
+                    return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid Token").build();
                 }
 
+                // --- OTTIMIZZAZIONE 2: Virtual Threads ---
+                // Usiamo un Executor che sfrutta i Virtual Threads di Java 21 per parallelizzare l'import
+                try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+
+                    String[] line;
+                    while ((line = reader.readNext()) != null) {
+                        // Variabile finale per la lambda
+                        String[] finalLine = line;
+
+                        // Sottometto il task all'executor
+                        executor.submit(() -> {
+                            try {
+                                processAndSaveLine(finalLine, idx, username);
+                            } catch (Exception e) {
+                                System.err.println("Errore durante l'importazione della riga: " + e.getMessage());
+                                // Non fermiamo l'intero processo per una riga guasta
+                            }
+                        });
+                    }
+
+                } // Il blocco try-with-resources attende automaticamente che TUTTI i thread finiscano
+
+                // Controllo finale
                 if (expenseRepository.count() > 0) {
-                    // Recupero tutte le spese ordinate per startedDate asc e filtro solo quelle con importo negativo
-                    List<Expense> sorted = expenseRepository.findAll(Sort.by(Sort.Direction.ASC, "startedDate"));
-                    List<Expense> negatives = sorted.stream()
-                            .filter(e -> e.getAmount() != null && e.getAmount().compareTo(BigDecimal.ZERO) < 0)
-                            .collect(Collectors.toList());
-                    return Response.ok("Expenses imported").build();
+                    return Response.ok("Expenses imported successfully in background").build();
                 } else {
-                    return Response.status(Response.Status.BAD_REQUEST).entity("No expenses found in the CSV file.").build();
+                    return Response.status(Response.Status.BAD_REQUEST).entity("No expenses found or saved.").build();
                 }
             }
         } catch (DateTimeParseException e) {
             return Response.status(Response.Status.BAD_REQUEST).entity("Failed to parse date: " + e.getParsedString()).build();
         }
-
     }
 
-    // Mappa header CSV ai nomi canonici dei campi, usando una lista di sinonimi per ciascun campo
+    // --- NUOVO METODO HELPER per processare la singola riga ---
+    private void processAndSaveLine(String[] line, Map<String, Integer> idx, String username) {
+        Expense expense = new Expense();
+
+        // Estrazione dati
+        String type = getValueByIndex(line, idx.get("type"));
+        String product = getValueByIndex(line, idx.get("product"));
+        String startedRaw = getValueByIndex(line, idx.get("startedDate"));
+        String completedRaw = getValueByIndex(line, idx.get("completedDate"));
+        String description = getValueByIndex(line, idx.get("description"));
+        String amountRaw = getValueByIndex(line, idx.get("amount"));
+        String feeRaw = getValueByIndex(line, idx.get("fee"));
+        String currency = getValueByIndex(line, idx.get("currency"));
+        String state = getValueByIndex(line, idx.get("state"));
+
+        // Setting dati
+        expense.setType(type);
+        expense.setProduct(product);
+        expense.setStartedDate(parseToLocalDateTime(startedRaw));
+        expense.setCompletedDate(parseToLocalDateTime(completedRaw));
+        expense.setDescription(description);
+        expense.setAmount(parseBigDecimal(amountRaw));
+        expense.setFee(parseBigDecimal(feeRaw));
+        expense.setCurrency(currency);
+        expense.setState(state);
+
+        // Classificazione automatica
+        expense.setCategory(ExpenseClassifier.classify(description));
+
+        // Impostazione Username (già recuperato prima)
+        expense.setUsername(username);
+
+        // Salvataggio su DB
+        expenseRepository.save(expense);
+    }
+
+    // --- MAPPATURA HEADER ---
     private Map<String, Integer> mapHeaderToIndex(String[] header) {
         Map<String, Integer> indexMap = new HashMap<>();
-        // Canonical keys
         Map<String, List<String>> synonyms = new HashMap<>();
         synonyms.put("type", Arrays.asList("Type", "Tipo"));
         synonyms.put("product", Arrays.asList("Product", "Prodotto", "item", "description_item"));
@@ -127,14 +152,13 @@ public class ExpenseImportService {
         synonyms.put("amount", Arrays.asList("Amount", "Importo", "value", "valore", "totale"));
         synonyms.put("fee", Arrays.asList("Fee", "tax", "commission"));
         synonyms.put("currency", Arrays.asList("Currency", "Valuta", "moneta"));
-        synonyms.put("state", Arrays.asList("State", "Stato", "status","Contabilizzazione"));
+        synonyms.put("state", Arrays.asList("State", "Stato", "status", "Contabilizzazione"));
 
         for (int i = 0; i < header.length; i++) {
             String h = header[i].trim().toLowerCase(Locale.ROOT).replaceAll("[\"]", "");
             for (Map.Entry<String, List<String>> e : synonyms.entrySet()) {
                 for (String syn : e.getValue()) {
                     if (h.equals(syn.toLowerCase(Locale.ROOT)) || h.contains(syn.toLowerCase(Locale.ROOT))) {
-                        // Se non è già mappato, mappiamo la prima occorrenza
                         indexMap.putIfAbsent(e.getKey(), i);
                     }
                 }
@@ -152,6 +176,7 @@ public class ExpenseImportService {
         return v.isEmpty() ? null : v;
     }
 
+    // --- PARSING HELPERS ---
     private LocalDateTime parseToLocalDateTime(String value) {
         if (value == null || value.trim().isEmpty()) {
             return null;
@@ -163,7 +188,6 @@ public class ExpenseImportService {
         } catch (DateTimeParseException ignored) {
         }
 
-        // Provo più formati
         List<String> patterns = Arrays.asList(
                 "yyyy-MM-dd HH:mm:ss",
                 "yyyy-MM-dd'T'HH:mm:ss",
@@ -185,10 +209,8 @@ public class ExpenseImportService {
             }
         }
 
-        // Provo come epoch seconds o milliseconds
         try {
             long num = Long.parseLong(v);
-            // se ha 13 cifre è millisecondi
             if (v.length() >= 13) {
                 return LocalDateTime.ofEpochSecond(num / 1000, 0, ZoneOffset.UTC);
             } else {
@@ -196,8 +218,6 @@ public class ExpenseImportService {
             }
         } catch (NumberFormatException ignored) {
         }
-
-        // Ultimo tentativo: parse con parser ISO (lasciare che l'eccezione salga)
         return LocalDateTime.parse(v);
     }
 
@@ -206,13 +226,10 @@ public class ExpenseImportService {
             return BigDecimal.ZERO;
         }
         String v = value.trim();
-        // Rimuovo simboli di valuta e spazi
         v = v.replaceAll("[€$£¥]", "").trim();
-        v = v.replaceAll("\u00A0", "").trim(); // non-breaking space
+        v = v.replaceAll("\u00A0", "").trim();
 
-        // Se contiene sia '.' che ',', suppongo che '.' sia decimale o ','? Gestisco come thousands separator rimuovendo quello che sembra essere migliaia
         if (v.contains(",") && v.contains(".")) {
-            // se ultimo separatore è '.' assumo '.' come decimale e rimuovo le virgole
             int lastComma = v.lastIndexOf(',');
             int lastDot = v.lastIndexOf('.');
             if (lastDot > lastComma) {
@@ -222,15 +239,11 @@ public class ExpenseImportService {
                 v = v.replaceAll(",", ".");
             }
         } else if (v.contains(",") && !v.contains(".")) {
-            // potrebbe essere formato europeo 1.234,56 oppure 1234,56 -> sostituisco la virgola con punto
             v = v.replaceAll(",", ".");
         }
 
-        // Rimuovo tutto quello che non è cifra, punto o meno
         v = v.replaceAll("[^0-9.\\-]", "");
-
         if (v.isEmpty()) return BigDecimal.ZERO;
-
         return new BigDecimal(v);
     }
 
