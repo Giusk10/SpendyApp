@@ -4,7 +4,7 @@ echo "🚀 Avvio SpendyApp All-in-One..."
 
 # 1. Avvia Auth Service in background
 echo "--> Avvio Auth Service (Porta 8081)..."
-java -Xms4G -Xmx4G -XX:+AlwaysPreTouch -XX:+UseG1GC -Dserver.port=8081 -jar /app/auth-service.jar > /app/auth.log 2>&1 &
+java -Xms1G -Xmx1G -XX:+UseG1GC -Dserver.port=8081 -jar /app/auth-service.jar > /app/auth.log 2>&1 &
 
 # 2. Avvia Expense Service in background
 echo "--> Avvio Expense Service (Porta 8084)..."
