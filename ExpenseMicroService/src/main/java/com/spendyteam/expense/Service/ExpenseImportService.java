@@ -278,7 +278,8 @@ public class ExpenseImportService {
 
         try {
             LocalDateTime start = parseToLocalDateTime(startedDate);
-            LocalDateTime end = parseToLocalDateTime(endDate);
+            LocalDateTime end = parseToLocalDateTime(endDate).plusDays(1).minusSeconds(1); // Inclusivo fino alla fine del giorno
+
 
             Iterable<Expense> expenses = expenseRepository.findAll().stream()
                 .filter(e -> e.getStartedDate() != null
@@ -288,7 +289,7 @@ public class ExpenseImportService {
                         && e.getStartedDate().isBefore(end)
                         && e.getCompletedDate().isAfter(start)
                         && e.getAmount() != null)
-                .filter(e -> username != null && username.equals(e.getUsername()))
+                .filter(e -> username.equals(e.getUsername()))
                 .toList();
 
 
