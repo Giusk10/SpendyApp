@@ -251,9 +251,12 @@ public class ExpenseImportService {
     public Response getExpenses(String token) {
         try {
             String username = getUsernameFromTokenViaRest(token);
+            if (username == null) {
+                return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token.").build();
+            }
             Iterable<Expense> expenses = expenseRepository.findAll(Sort.by(Sort.Direction.ASC, "startedDate"))
                     .stream()
-                    .filter(e -> e.getAmount() != null && e.getAmount().compareTo(BigDecimal.ZERO) < 0 && username != null && username.equals(e.getUsername()))
+                    .filter(e -> e.getAmount() != null && username.equals(e.getUsername()))
                     .collect(Collectors.toList());
 
             if (!expenses.iterator().hasNext()) {
@@ -269,6 +272,9 @@ public class ExpenseImportService {
     public Response getExpenseByDate(String startedDate, String endDate, String token) {
 
         String username = getUsernameFromTokenViaRest(token);
+        if (username == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token.").build();
+        }
 
         try {
             LocalDateTime start = parseToLocalDateTime(startedDate);
@@ -281,8 +287,7 @@ public class ExpenseImportService {
                         && !e.getCompletedDate().isAfter(end)
                         && e.getStartedDate().isBefore(end)
                         && e.getCompletedDate().isAfter(start)
-                        && e.getAmount() != null
-                        && e.getAmount().compareTo(BigDecimal.ZERO) < 0)
+                        && e.getAmount() != null)
                 .filter(e -> username != null && username.equals(e.getUsername()))
                 .toList();
 
@@ -405,6 +410,9 @@ public class ExpenseImportService {
             expense.setCategory(ExpenseClassifier.classify(body.get("description")));
 
             String username = getUsernameFromTokenViaRest(token);
+            if (username == null) {
+                return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token").build();
+            }
             expense.setUsername(username);
 
             expenseRepository.save(expense);
