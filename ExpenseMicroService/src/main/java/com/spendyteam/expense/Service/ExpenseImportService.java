@@ -423,6 +423,56 @@ public class ExpenseImportService {
         }
     }
 
+    public Response updateExpense(Map<String, String> body, String token) {
+        try {
+            String expenseId = body.get("id");
+            if (expenseId == null || expenseId.isEmpty()) {
+                return Response.status(Response.Status.BAD_REQUEST).entity("Expense ID is required for update.").build();
+            }
+
+            Optional<Expense> expenseOpt = expenseRepository.findById(expenseId);
+
+            if (expenseOpt.isEmpty()) {
+                return Response.status(Response.Status.NOT_FOUND).entity("Expense not found.").build();
+            }
+
+            Expense expense = expenseOpt.get();
+
+            String username = getUsernameFromTokenViaRest(token);
+            if (username == null) {
+                return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token").build();
+            }
+            if (!username.equals(expense.getUsername())) {
+                return Response.status(Response.Status.FORBIDDEN).entity("You are not authorized to update this expense.").build();
+            }
+
+            if (body.get("type") != null) {
+                expense.setType(body.get("type"));
+            }
+
+            if(body.get("startedDate") != null) {
+                expense.setStartedDate(parseToLocalDateTime(body.get("startedDate")));
+            }
+
+            if(body.get("completedDate") != null) {
+                expense.setCompletedDate(parseToLocalDateTime(body.get("completedDate")));
+            }
+
+            if(body.get("description") != null) {
+                expense.setDescription(body.get("description"));
+            }
+
+            if(body.get("amount") != null) {
+                expense.setAmount(parseBigDecimal(body.get("amount")));
+            }
+
+            expenseRepository.save(expense);
+            return Response.status(Response.Status.OK).entity(expense).build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Failed to update expense: " + e.getMessage()).build();
+        }
+    }
+
 
     public Response deleteAllExpenses(String token) {
         try {

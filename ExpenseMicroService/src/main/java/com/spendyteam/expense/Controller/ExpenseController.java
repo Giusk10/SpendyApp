@@ -162,6 +162,22 @@ public class ExpenseController {
         }
     }
 
+    @PostMapping("/updateExpense")
+    @Produces("application/json")
+    public ResponseEntity<Object> updateExpense(@RequestBody Map<String, String> body, @RequestHeader (value = "Authorization", required = false) String authHeader) {
+        try {
+            String token = authHeader.substring(7);
+            Response res = expenseService.updateExpense(body, token);
+            if(res.getStatus() == 200){
+                return ResponseEntity.ok().body(res.getEntity());
+            } else {
+                return ResponseEntity.status(res.getStatus()).body(res.getEntity().toString());
+            }
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Failed to update expense: " + e.getMessage());
+        }
+    }
+
     @PostMapping("/test" )
     public ResponseEntity<String> testEndpoint() {
         return ResponseEntity.ok("Expense Microservice is up and running!");
