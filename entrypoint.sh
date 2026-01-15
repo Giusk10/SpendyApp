@@ -15,7 +15,9 @@ java -Xms6G -Xmx6G -XX:+AlwaysPreTouch -XX:+UseG1GC -Dserver.port=8084 -jar /app
 echo "⏳ Attendo 15 secondi per l'avvio dei backend..."
 sleep 15
 
-# 4. Avvia Gateway Service in foreground (Mantiene vivo il container)
-# Nota: Il gateway userà la porta 7860 grazie alla variabile d'ambiente
+# 4. Avvia Gateway Service in foreground con Access Logs forzati
 echo "--> Avvio Gateway Service (Porta 7860)..."
-java -Xms4G -Xmx4G -XX:+AlwaysPreTouch -XX:+UseG1GC -Dserver.port=7860 -jar /app/gateway-service.jar
+java -Xms4G -Xmx4G -XX:+AlwaysPreTouch -XX:+UseG1GC \
+     -Dserver.port=7860 \
+     -Dreactor.netty.http.server.accessLogEnabled=true \
+     -jar /app/gateway-service.jar
