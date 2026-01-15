@@ -254,10 +254,11 @@ public class ExpenseImportService {
             if (username == null) {
                 return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token.").build();
             }
-            Iterable<Expense> expenses = expenseRepository.findAll(Sort.by(Sort.Direction.ASC, "startedDate"))
-                    .stream()
-                    .filter(e -> e.getAmount() != null && username.equals(e.getUsername()))
-                    .collect(Collectors.toList());
+
+            List<Expense> expenses = expenseRepository.findByUsername(
+                    username,
+                    Sort.by(Sort.Direction.ASC, "startedDate")
+            );
 
             if (!expenses.iterator().hasNext()) {
                 return Response.status(Response.Status.NO_CONTENT).entity("No expenses found.").build();
@@ -281,7 +282,7 @@ public class ExpenseImportService {
             LocalDateTime end = parseToLocalDateTime(endDate).plusDays(1).minusSeconds(1); // Inclusivo fino alla fine del giorno
 
 
-            Iterable<Expense> expenses = expenseRepository.findAll().stream()
+            Iterable<Expense> expenses = expenseRepository.findByUsername(username).stream()
                 .filter(e -> e.getStartedDate() != null
                         && e.getCompletedDate() != null
                         && !e.getStartedDate().isBefore(start)
@@ -289,7 +290,6 @@ public class ExpenseImportService {
                         && e.getStartedDate().isBefore(end)
                         && e.getCompletedDate().isAfter(start)
                         && e.getAmount() != null)
-                .filter(e -> username.equals(e.getUsername()))
                 .toList();
 
 
