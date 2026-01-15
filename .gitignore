@@ -10,3 +10,4 @@
 /dataSources.local.xml
 .env
 /target/
+/node_modules/
