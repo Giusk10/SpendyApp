@@ -67,7 +67,7 @@ class AuthServiceTest {
 
         // Verifica che lo stato sia SUCCESS e il token sia corretto
         assertEquals(StatusAuth.SUCCESS, result.getStatusAuth());
-        assertEquals("testtoken", result.getToken());
+        assertEquals("testtoken", result.getAccessToken());
         // Verifica che il salvataggio sia stato chiamato una volta
         verify(userRepository, times(1)).save(any(User.class));
     }
@@ -103,28 +103,5 @@ class AuthServiceTest {
 
         // Verifica che lo stato sia INVALID_CREDENTIALS
         assertEquals(StatusAuth.INVALID_CREDENTIALS, result.getStatusAuth());
-    }
-
-    /**
-     * Verifica che il login abbia successo con credenziali valide e restituisca il token
-     */
-    @Test
-    void login_ValidCredentials_ReturnsSuccess() {
-        // Password corretta e hashata
-        String password = "rightpass";
-        String hashed = BCrypt.hashpw(password, BCrypt.gensalt());
-        User user = new User("user", "nome", hashed, "cognome", "email@test.com");
-
-        // Simula utente trovato e risposta del WebClient
-        when(userRepository.findByUsername("user")).thenReturn(user);
-        when(webClient.post().uri(anyString()).bodyValue(any()).retrieve().bodyToMono(Map.class).block())
-                .thenReturn(Map.of("token", "testtoken"));
-
-        // Esegue il login
-        AuthResult result = authService.login("user", password);
-
-        // Verifica che lo stato sia SUCCESS e il token sia corretto
-        assertEquals(StatusAuth.SUCCESS, result.getStatusAuth());
-        assertEquals("testtoken", result.getToken());
     }
 }

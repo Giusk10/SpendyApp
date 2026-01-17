@@ -8,6 +8,8 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
@@ -37,9 +39,11 @@ public class AuthController {
         }
 
         if (result.getStatusAuth() == StatusAuth.SUCCESS) {
-            //System.out.println("Token: " + result.getToken());
-            // Generate a token and return it in the response
-            return Response.ok("{\"token\":\"" + result.getToken() + "\"}").type("application/json").build();
+            // Opzionale: ritorna token subito anche qui
+            Map<String, String> responseMap = new HashMap<>();
+            responseMap.put("accessToken", result.getAccessToken());
+            responseMap.put("refreshToken", result.getRefreshToken());
+            return Response.ok(responseMap).build();
         } else if (result.getStatusAuth() == StatusAuth.USER_NOT_FOUND) {
             return Response.status(Response.Status.NOT_FOUND).entity("Utente non trovato").build();
         } else if (result.getStatusAuth() == StatusAuth.INVALID_CREDENTIALS) {
@@ -69,6 +73,29 @@ public class AuthController {
             return Response.status(Response.Status.CONFLICT).entity("User already exists").build();
         }
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("An error occurred").build();
+    }
+
+    @POST
+    @Path("/refresh")
+    @Consumes("application/json")
+    @Produces("application/json")
+    public Response refreshToken(Map<String, String> body) {
+        String requestRefreshToken = body.get("refreshToken");
+
+        if (requestRefreshToken == null || requestRefreshToken.isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Refresh Token missing").build();
+        }
+
+        AuthResult result = authService.refreshAccessToken(requestRefreshToken);
+
+        if (result.getStatusAuth() == StatusAuth.SUCCESS) {
+            Map<String, String> responseMap = new HashMap<>();
+            responseMap.put("accessToken", result.getAccessToken());
+            responseMap.put("refreshToken", result.getRefreshToken()); // Ritorna il NUOVO token (rotazione)
+            return Response.ok(responseMap).build();
+        } else {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Refresh Token expired or invalid").build();
+        }
     }
 
     private static boolean validateEmail(String email) {

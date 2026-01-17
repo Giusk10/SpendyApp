@@ -1,28 +1,25 @@
 package com.spendy.auth.Utility;
 
-public class AuthResult
-{
+public class AuthResult {
     private StatusAuth statusAuth;
-    private String token;
+    private String accessToken;
+    private String refreshToken; // Nuovo campo
 
-    public AuthResult(StatusAuth statusAuth, String token) {
+    // Costruttore per successo (2 token)
+    public AuthResult(StatusAuth statusAuth, String accessToken, String refreshToken) {
         this.statusAuth = statusAuth;
-        this.token = token;
+        this.accessToken = accessToken;
+        this.refreshToken = refreshToken;
     }
 
-    public StatusAuth getStatusAuth() {
-        return statusAuth;
-    }
-
-    public void setStatusAuth(StatusAuth statusAuth) {
+    // Costruttore per errore (0 token) o compatibilità
+    public AuthResult(StatusAuth statusAuth, String accessToken) {
         this.statusAuth = statusAuth;
+        this.accessToken = accessToken;
+        this.refreshToken = null;
     }
 
-    public String getToken() {
-        return token;
-    }
-
-    public void setToken(String token) {
-        this.token = token;
-    }
+    public StatusAuth getStatusAuth() { return statusAuth; }
+    public String getAccessToken() { return accessToken; }
+    public String getRefreshToken() { return refreshToken; }
 }
