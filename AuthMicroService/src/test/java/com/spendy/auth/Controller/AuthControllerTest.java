@@ -4,7 +4,6 @@ import com.spendy.auth.Data.User;
 import com.spendy.auth.Service.AuthService;
 import com.spendy.auth.Utility.AuthResult;
 import com.spendy.auth.Utility.StatusAuth;
-import com.spendy.auth.Utility.UserResult;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -221,48 +220,5 @@ class AuthControllerTest {
         // Verifica che la risposta sia 500 INTERNAL SERVER ERROR e il messaggio corretto
         assertEquals(Response.Status.INTERNAL_SERVER_ERROR.getStatusCode(), response.getStatus());
         assertEquals("An error occurred", response.getEntity());
-    }
-
-    /**
-     * Verifica ricerca utenti per houseId con utenti trovati: deve restituire 200 OK e una lista di utenti
-     */
-    @Test
-    void testGetUserByHouseIdUsersFound() {
-        // Crea una richiesta con houseId valido
-        Map<String, String> requestBody = new HashMap<>();
-        requestBody.put("houseId", "HOUSE123");
-        UserResult result = mock(UserResult.class);
-        // Simula il comportamento del servizio di ricerca utenti
-        when(result.getStatusAuth()).thenReturn(StatusAuth.USERS_FOUNDED);
-        when(result.getUsers()).thenReturn(Arrays.asList(new User(), new User()));
-        when(authService.getUserByHouseId("HOUSE123")).thenReturn(result);
-
-        // Esegue la ricerca tramite il controller
-        Response response = authController.getUserByHouseId(requestBody);
-
-        // Verifica che la risposta sia 200 OK e contenga una lista di utenti
-        assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-        assertInstanceOf(List.class, response.getEntity());
-    }
-
-    /**
-     * Verifica ricerca utenti per houseId senza utenti trovati: deve restituire 404 NOT FOUND e messaggio di errore
-     */
-    @Test
-    void testGetUserByHouseIdUsersNotFound() {
-        // Crea una richiesta con houseId valido ma senza utenti associati
-        Map<String, String> requestBody = new HashMap<>();
-        requestBody.put("houseId", "HOUSE123");
-        UserResult result = mock(UserResult.class);
-        // Simula il comportamento del servizio di ricerca utenti
-        when(result.getStatusAuth()).thenReturn(StatusAuth.USERS_NOT_FOUND);
-        when(authService.getUserByHouseId("HOUSE123")).thenReturn(result);
-
-        // Esegue la ricerca tramite il controller
-        Response response = authController.getUserByHouseId(requestBody);
-
-        // Verifica che la risposta sia 404 NOT FOUND e il messaggio corretto
-        assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-        assertEquals("No users found for the given house ID", response.getEntity());
     }
 }

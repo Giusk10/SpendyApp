@@ -4,7 +4,6 @@ import com.spendy.auth.Data.User;
 import com.spendy.auth.Repository.IUserRepository;
 import com.spendy.auth.Utility.AuthResult;
 import com.spendy.auth.Utility.StatusAuth;
-import com.spendy.auth.Utility.UserResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mindrot.jbcrypt.BCrypt;
@@ -128,60 +127,4 @@ class AuthServiceTest {
         assertEquals(StatusAuth.SUCCESS, result.getStatusAuth());
         assertEquals("testtoken", result.getToken());
     }
-
-    /**
-     * Verifica che la ricerca utenti per houseId trovi utenti e restituisca USERS_FOUNDED
-     */
-    @Test
-    void getUserByHouseId_UsersFound_ReturnsUsersFounded() {
-        // HouseId e hash corrispondente
-        String houseId = "house";
-        String hashedHouseId = BCrypt.hashpw(houseId, BCrypt.gensalt());
-        User user = mock(User.class);
-
-        // Simula valore di houseUser e lista utenti
-        when(user.getHouseUser()).thenReturn(hashedHouseId);
-        when(userRepository.findAll()).thenReturn(List.of(user));
-
-        // Mock statico di BCrypt.checkpw per forzare true
-        try (var mocked = Mockito.mockStatic(BCrypt.class)) {
-            mocked.when(() -> BCrypt.checkpw(eq(houseId), anyString())).thenReturn(true);
-
-            // Esegue la ricerca
-            UserResult result = authService.getUserByHouseId(houseId);
-
-            // Verifica che lo stato sia USERS_FOUNDED e la lista non sia nulla
-            assertEquals(StatusAuth.USERS_FOUNDED, result.getStatusAuth());
-            assertNotNull(result.getUsers());
-        }
-    }
-
-    /**
-     * Verifica che la ricerca coinquilini per houseId restituisca la lista corretta di utenti
-     */
-    @Test
-    void getCoinquilinibyHouseId_UsersFound_ReturnsList() {
-        // HouseId e hash corrispondente
-        String houseId = "house";
-        String hashedHouseId = BCrypt.hashpw(houseId, BCrypt.gensalt());
-        User user = mock(User.class);
-
-        // Simula valore di houseUser e lista utenti
-        when(user.getHouseUser()).thenReturn(hashedHouseId);
-        when(userRepository.findAll()).thenReturn(List.of(user));
-
-        // Mock statico di BCrypt.checkpw per forzare true
-        try (var mocked = Mockito.mockStatic(BCrypt.class)) {
-            mocked.when(() -> BCrypt.checkpw(eq(houseId), anyString())).thenReturn(true);
-
-            // Esegue la ricerca dei coinquilini
-            List<User> result = authService.getCoinquilinibyHouseId(houseId);
-
-            // Verifica che la lista sia corretta
-            assertNotNull(result);
-            assertEquals(1, result.size());
-            assertEquals(user, result.get(0));
-        }
-    }
-
 }

@@ -4,12 +4,10 @@ import com.spendy.auth.Data.User;
 import com.spendy.auth.Service.AuthService;
 import com.spendy.auth.Utility.AuthResult;
 import com.spendy.auth.Utility.StatusAuth;
-import com.spendy.auth.Utility.UserResult;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 
-import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
@@ -77,21 +75,6 @@ public class AuthController {
         if (email == null) return false;
         Matcher matcher = EMAIL_PATTERN.matcher(email);
         return matcher.matches();
-    }
-
-    @POST
-    @Path("/getUserByHouseId")
-    @Consumes("application/json")
-    @Produces("application/json")
-    public Response getUserByHouseId(Map<String, String> requestBody) {
-        String houseId = requestBody.get("houseId");
-        UserResult result = authService.getUserByHouseId(houseId);
-        if (result.getStatusAuth() == StatusAuth.USERS_FOUNDED) {
-            return Response.ok(result.getUsers()).build();
-        } else if (result.getStatusAuth() == StatusAuth.USERS_NOT_FOUND) {
-            return Response.status(Response.Status.NOT_FOUND).entity("No users found for the given house ID").build();
-        }
-        return null;
     }
 
     @GET
