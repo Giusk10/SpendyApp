@@ -34,17 +34,42 @@
         <java.version>21</java.version>
     </properties>
 
-    <!--<dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-dependencies</artifactId>
-                <version>3.4.5</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>2.4.0</version>
+                <executions>
+                    <execution>
+                        <id>add-third-party</id>
+                        <goals>
+                            <goal>add-third-party</goal>
+                        </goals>
+                        <phase>generate-resources</phase>
+                        <configuration>
+                            <thirdPartyFilename>THIRD-PARTY.txt</thirdPartyFilename>
+                            <useMissingFile>true</useMissingFile>
+                            <failOnMissing>false</failOnMissing>
+                        </configuration>
+                    </execution>
 
+                    <execution>
+                        <id>aggregate-add-third-party</id>
+                        <goals>
+                            <goal>aggregate-add-third-party</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <outputDirectory>${project.basedir}</outputDirectory>
+                            <thirdPartyFilename>THIRD-PARTY-ALL.txt</thirdPartyFilename>
+                            <useMissingFile>true</useMissingFile>
+                            <failOnMissing>false</failOnMissing>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 
-        </dependencies>
-    </dependencyManagement>-->
 </project>

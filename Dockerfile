@@ -5,6 +5,9 @@ WORKDIR /app
 # Copia tutto il codice sorgente
 COPY . .
 
+# Nota: Grazie alla modifica nel pom.xml padre, questi comandi generano
+# automaticamente anche i file THIRD-PARTY.txt dentro le cartelle target.
+
 # Compila Auth Service
 WORKDIR /app/AuthMicroService
 RUN mvn clean package -DskipTests
@@ -24,11 +27,22 @@ WORKDIR /app
 # Installa bash (utile per lo script)
 RUN apk add --no-cache bash
 
-# Copia i JAR compilati dalla fase precedente
+# --- COPIA DEI JAR (Applicazioni) ---
 COPY --from=build /app/AuthMicroService/target/*.jar /app/auth-service.jar
 COPY --from=build /app/ExpenseMicroService/target/*.jar /app/expense-service.jar
 COPY --from=build /app/Gateway/target/*.jar /app/gateway-service.jar
 
+# --- COPIA DELLE LICENZE (Crediti Autori) ---
+# 1. Creiamo una cartella per tenerle ordinate
+RUN mkdir -p /app/licenses/auth /app/licenses/expense /app/licenses/gateway
+
+# 2. Copiamo i file generati dal plugin Maven nella Fase 1
+# Nota: Il plugin li mette di default in target/generated-sources/license/
+COPY --from=build /app/AuthMicroService/target/generated-sources/license/THIRD-PARTY.txt /app/licenses/auth/THIRD-PARTY.txt
+COPY --from=build /app/ExpenseMicroService/target/generated-sources/license/THIRD-PARTY.txt /app/licenses/expense/THIRD-PARTY.txt
+COPY --from=build /app/Gateway/target/generated-sources/license/THIRD-PARTY.txt /app/licenses/gateway/THIRD-PARTY.txt
+
+# --- SETUP AVVIO ---
 # Copia lo script di avvio e rendilo eseguibile
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
