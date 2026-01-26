@@ -10,6 +10,8 @@ app_port: 7860
 ---
 
 # SpendyApp 🏠💸
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FGiusk10%2FSpendyApp.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FGiusk10%2FSpendyApp?ref=badge_shield)
+
 
 SpendyApp è un'applicazione a microservizi per la gestione delle spese condivise tra coinquilini. Permette di registrare utenti, gestire gruppi (case), tracciare le spese e calcolare i conguagli.
 
@@ -41,3 +43,6 @@ Il progetto è basato su **Spring Boot** e segue un'architettura a microservizi 
 ## License 📄
 
 Distribuito sotto la licenza AGPLv3. Vedi il file `LICENSE` per maggiori informazioni.
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FGiusk10%2FSpendyApp.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FGiusk10%2FSpendyApp?ref=badge_large)
