@@ -122,4 +122,24 @@ public class AuthService {
         }
         return null;
     }
+
+    public AuthResult updateUserProfile(String accessToken, User updatedUser) {
+        String username = verifyTokenViaRest(accessToken);
+        if (username == null) {
+            return new AuthResult(StatusAuth.TOKEN_INVALID, null);
+        }
+
+        User existingUser = userRepository.findByUsername(username);
+        if (existingUser == null) {
+            return new AuthResult(StatusAuth.USER_NOT_FOUND, null);
+        }
+
+        // Aggiorna i campi permessi
+        existingUser.setName(updatedUser.getName());
+        existingUser.setSurname(updatedUser.getSurname());
+        // Non si aggiorna username, email o password qui per motivi di sicurezza
+
+        userRepository.save(existingUser);
+        return new AuthResult(StatusAuth.SUCCESS, null);
+    }
 }

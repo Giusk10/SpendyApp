@@ -125,6 +125,28 @@ public class AuthController {
         }
     }
 
+    @PUT
+    @Path("/updateProfile")
+    @Consumes("application/json")
+    @Produces("application/json")
+    public Response updateProfile(@HeaderParam("Authorization") String authHeader, User updatedUser) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Missing or invalid Authorization header").build();
+        }
+        String accessToken = authHeader.substring(7);
+        AuthResult result = authService.updateUserProfile(accessToken, updatedUser);
+
+        if (result.getStatusAuth() == StatusAuth.SUCCESS) {
+            return Response.ok("Profile updated successfully").build();
+        }
+        else if (result.getStatusAuth() == StatusAuth.USER_NOT_FOUND) {
+            return Response.status(Response.Status.NOT_FOUND).entity("User not found").build();
+        }
+        else {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("An error occurred").build();
+        }
+    }
+
     @GET
     @Path("/health")
     public Response healthCheck() {
