@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.POST, "/gateway/generate-token").permitAll()
                         .pathMatchers(HttpMethod.POST, "/gateway/verify-token").permitAll()
                         .pathMatchers(HttpMethod.GET,"/").permitAll()
+                        .pathMatchers(HttpMethod.GET,"/Auth/rest/auth/profile").permitAll()
                         .pathMatchers("/Auth/**").permitAll()
                         .pathMatchers("/Expense/**").authenticated()
                         .anyExchange().authenticated()

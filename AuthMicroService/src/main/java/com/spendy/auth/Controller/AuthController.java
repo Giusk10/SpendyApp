@@ -105,6 +105,27 @@ public class AuthController {
     }
 
     @GET
+    @Path("/profile")
+    @Produces("application/json")
+    public Response getProfile(@HeaderParam("Authorization") String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Missing or invalid Authorization header").build();
+        }
+        String accessToken = authHeader.substring(7);
+        User user = authService.getUserFromToken(accessToken);
+        if (user != null) {
+            Map<String, String> profileMap = new HashMap<>();
+            profileMap.put("username", user.getUsername());
+            profileMap.put("name", user.getName());
+            profileMap.put("surname", user.getSurname());
+            profileMap.put("email", user.getEmail());
+            return Response.ok(profileMap).build();
+        } else {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid access token").build();
+        }
+    }
+
+    @GET
     @Path("/health")
     public Response healthCheck() {
         return Response.ok("AuthMicroService is running").build();

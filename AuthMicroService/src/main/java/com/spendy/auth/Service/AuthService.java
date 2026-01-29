@@ -102,4 +102,24 @@ public class AuthService {
         refreshTokenRepository.save(rt);
         return token;
     }
+
+    private String verifyTokenViaRest(String token) {
+        Map responseMap = webClient.post()
+                .uri("http://localhost:7860/gateway/verify-token")
+                .bodyValue(Map.of("token", token))
+                .retrieve()
+                .bodyToMono(Map.class)
+                .block(); // blocca fino a ricevere risposta
+
+        return (String) responseMap.get("username");
+    }
+
+    public User getUserFromToken(String accessToken) {
+
+        String username = verifyTokenViaRest(accessToken);
+        if (username != null) {
+            return userRepository.findByUsername(username);
+        }
+        return null;
+    }
 }
