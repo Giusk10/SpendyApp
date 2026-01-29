@@ -10,3 +10,4 @@
 /dataSources.local.xml
 .env
 /target/
+/ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/dataset.txt
