@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 
 public class ExpenseModelTrainer {
 
-    private static final String MODEL_FILE = "ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/expense-model.bin";
+    private static final String MODEL_FILE = "ExpenseMicroService/src/main/resources/expense-model.bin";
     private static final String TRAINING_FILE = "ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/dataset.txt";
 
     public static void main(String[] args) {

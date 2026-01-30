@@ -15,7 +15,7 @@ public class SmartCategorizerService {
 
     private DoccatModel model;
     // Nome del file previsto nelle risorse (dentro la cartella resources)
-    private static final String MODEL_FILENAME = "ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/expense-model.bin";
+    private static final String MODEL_FILENAME = "/expense-model.bin";
     // Nome del file nel file system locale (per quando lo crei o sei in dev)
     private static final String MODEL_FILE_LOCAL = "ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/expense-model.bin";
 
