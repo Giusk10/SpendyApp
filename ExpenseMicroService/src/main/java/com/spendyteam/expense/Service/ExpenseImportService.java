@@ -34,6 +34,9 @@ public class ExpenseImportService {
     private IExpenseRepository expenseRepository;
     private WebClient webClient;
 
+    @Autowired
+    private SmartCategorizerService smartCategorizerService;
+
     public ExpenseImportService() {
         this.webClient = WebClient.builder().build();
     }
@@ -132,7 +135,7 @@ public class ExpenseImportService {
         expense.setState(state);
 
         // Classificazione automatica
-        expense.setCategory(ExpenseClassifier.classify(description));
+        expense.setCategory(smartCategorizerService.predictCategory(description));
 
         // Impostazione Username (già recuperato prima)
         expense.setUsername(username);
@@ -408,7 +411,7 @@ public class ExpenseImportService {
             expense.setFee(parseBigDecimal(body.get("fee")));
             expense.setCurrency(body.get("currency"));
             expense.setState(body.get("state"));
-            expense.setCategory(ExpenseClassifier.classify(body.get("description")));
+            expense.setCategory(smartCategorizerService.predictCategory(body.get("description")));
 
             String username = getUsernameFromTokenViaRest(token);
             if (username == null) {
@@ -460,6 +463,7 @@ public class ExpenseImportService {
 
             if(body.get("description") != null) {
                 expense.setDescription(body.get("description"));
+                expense.setCategory(smartCategorizerService.predictCategory(body.get("description")));
             }
 
             if(body.get("amount") != null) {
