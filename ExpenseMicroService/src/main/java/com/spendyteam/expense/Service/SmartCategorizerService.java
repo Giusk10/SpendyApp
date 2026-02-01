@@ -17,7 +17,7 @@ public class SmartCategorizerService {
     // Nome del file previsto nelle risorse (dentro la cartella resources)
     private static final String MODEL_FILENAME = "/expense-model.bin";
     // Nome del file nel file system locale (per quando lo crei o sei in dev)
-    private static final String MODEL_FILE_LOCAL = "ExpenseMicroService/src/main/resorces/expense-model.bin";
+    private static final String MODEL_FILE_LOCAL = "ExpenseMicroService/src/main/resources/expense-model.bin";
 
     @PostConstruct
     public void init() {
@@ -88,13 +88,21 @@ public class SmartCategorizerService {
 
             DoccatModel trainedModel = DocumentCategorizerME.train("it", sampleStream, params, new DoccatFactory());
 
-            // Salva su file system locale (così puoi prenderlo e spostarlo in resources dopo)
-            try (OutputStream modelOut = new BufferedOutputStream(new FileOutputStream(MODEL_FILE_LOCAL))) {
-                trainedModel.serialize(modelOut);
-            }
+            // Aggiorna il modello in memoria
+            this.model = trainedModel;
 
-            this.model = trainedModel; // Aggiorna il modello in memoria
-            return "Training completato! File salvato in root come '" + MODEL_FILE_LOCAL + "'.";
+            // Tenta di salvare su file system locale (solo se la directory esiste)
+            File modelFile = new File(MODEL_FILE_LOCAL);
+            File parentDir = modelFile.getParentFile();
+
+            if (parentDir != null && parentDir.exists()) {
+                try (OutputStream modelOut = new BufferedOutputStream(new FileOutputStream(modelFile))) {
+                    trainedModel.serialize(modelOut);
+                }
+                return "Training completato! File salvato in '" + MODEL_FILE_LOCAL + "'.";
+            } else {
+                return "Training completato! Modello aggiornato in memoria (file non salvato, directory non trovata).";
+            }
         }
     }
 }
