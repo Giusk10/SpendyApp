@@ -94,5 +94,57 @@ class TokenManagerTest {
         assertNotNull(claims.getExpiration());
         assertTrue(claims.getExpiration().getTime() > System.currentTimeMillis());
     }
+
+    @Test
+    void testVerifyToken_NullToken() {
+        String result = tokenManager.verifyToken(null);
+        assertNull(result);
+    }
+
+    @Test
+    void testVerifyToken_EmptyToken() {
+        String result = tokenManager.verifyToken("");
+        assertNull(result);
+    }
+
+    @Test
+    void testVerifyToken_MalformedToken() {
+        String malformedToken = "not.a.valid.jwt.token.at.all";
+        String result = tokenManager.verifyToken(malformedToken);
+        assertNull(result);
+    }
+
+    @Test
+    void testGenerateToken_SpecialCharactersInUsername() {
+        String username = "test@user.com";
+        String token = tokenManager.generateToken(username);
+
+        assertNotNull(token);
+        String result = tokenManager.verifyToken(token);
+        assertEquals(username, result);
+    }
+
+    @Test
+    void testGenerateToken_LongUsername() {
+        String username = "a".repeat(100);
+        String token = tokenManager.generateToken(username);
+
+        assertNotNull(token);
+        String result = tokenManager.verifyToken(token);
+        assertEquals(username, result);
+    }
+
+    @Test
+    void testVerifyToken_TokenWithWrongSignature() {
+        String username = "testuser";
+        String token = tokenManager.generateToken(username);
+
+        // Modifica l'ultimo carattere del token per invalidare la firma
+        String tamperedToken = token.substring(0, token.length() - 1) + "X";
+        String result = tokenManager.verifyToken(tamperedToken);
+
+        assertNull(result);
+    }
 }
+
 

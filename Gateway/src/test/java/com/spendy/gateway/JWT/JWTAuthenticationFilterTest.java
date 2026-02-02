@@ -8,9 +8,11 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.http.server.reactive.MockServerHttpRequest;
 import org.springframework.mock.web.server.MockServerWebExchange;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.test.StepVerifier;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,7 +36,6 @@ class JWTAuthenticationFilterTest {
         // Then
         assertNotNull(filter);
     }
-
 
     @Test
     void testValidTokenScenario() {
@@ -131,7 +132,6 @@ class JWTAuthenticationFilterTest {
     void testBearerTokenWithSpace() {
         // Test Bearer with space
         String authHeader = "Bearer ";
-        assertTrue(authHeader.startsWith("Bearer "));
         assertEquals(7, authHeader.length());
 
         String token = authHeader.substring(7);
@@ -152,5 +152,12 @@ class JWTAuthenticationFilterTest {
         assertEquals("testuser", result);
         verify(tokenManager).verifyToken(token);
     }
+
+    @Test
+    void testFilterNotNull() {
+        assertNotNull(jwtAuthenticationFilter);
+    }
 }
+
+
 
