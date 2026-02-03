@@ -6,7 +6,6 @@ import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import com.spendyteam.expense.Data.Expense;
 import com.spendyteam.expense.Repository.IExpenseRepository;
-import com.spendyteam.expense.Utility.ExpenseClassifier;
 import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
@@ -23,22 +22,38 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.*;
-import java.util.concurrent.Executors; // Importante per i Virtual Threads
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.stream.Collectors;
-import java.util.List;
 
 @Service
 public class ExpenseImportService {
 
     @Autowired
     private IExpenseRepository expenseRepository;
-    private WebClient webClient;
 
     @Autowired
     private SmartCategorizerService smartCategorizerService;
 
+    private final WebClient webClient;
+
+    // --- OTTIMIZZAZIONE GLOBALE ---
+    // Questo semaforo è STATIC: condiviso tra TUTTE le istanze del service e TUTTI gli utenti.
+    // Impedisce a MongoDB Atlas di esplodere limitando le scritture simultanee a 10 batch.
+    private static final Semaphore DB_WRITE_SEMAPHORE = new Semaphore(10);
+
+    // Dimensione del blocco per il salvataggio su Mongo
+    private static final int BATCH_SIZE = 500;
+
     public ExpenseImportService() {
         this.webClient = WebClient.builder().build();
+    }
+
+    // Costruttore per i test con WebClient mockato
+    public ExpenseImportService(WebClient webClient) {
+        this.webClient = webClient;
     }
 
     public Response importExpensesFromCsv(MultipartFile file, String token) throws Exception {
@@ -46,106 +61,146 @@ public class ExpenseImportService {
             return Response.status(Response.Status.NO_CONTENT).entity("CSV file is empty.").build();
         }
 
+        // 1. Validazione Utente (una sola volta all'inizio)
+        String username = getUsernameFromTokenViaRest(token);
+        if (username == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid Token").build();
+        }
+
         try (BufferedReader br = new BufferedReader(new InputStreamReader(file.getInputStream()))) {
-            String headerLine = br.readLine(); // read raw header line to detect separator
-            if (headerLine == null) {
-                return Response.status(Response.Status.BAD_REQUEST).entity("CSV file has no header.").build();
-            }
+            // ... (Logica rilevamento separatore invariata) ...
+            String headerLine = br.readLine();
+            if (headerLine == null) return Response.status(Response.Status.BAD_REQUEST).entity("No header.").build();
 
-            // detect separator logic
-            int countComma = headerLine.length() - headerLine.replace(",", "").length();
-            int countSemi = headerLine.length() - headerLine.replace(";", "").length();
-            int countTab = headerLine.length() - headerLine.replace("\t", "").length();
-            char separator = ',';
-            int max = Math.max(countComma, Math.max(countSemi, countTab));
-            if (max == countSemi) separator = ';';
-            else if (max == countTab) separator = '\t';
-
+            char separator = detectSeparator(headerLine);
             CSVParser parser = new CSVParserBuilder().withSeparator(separator).build();
             String[] header = parser.parseLine(headerLine);
 
             try (CSVReader reader = new CSVReaderBuilder(br).withCSVParser(parser).build()) {
                 Map<String, Integer> idx = mapHeaderToIndex(header);
 
-                // --- OTTIMIZZAZIONE 1: Chiamata Auth unica ---
-                // Invece di chiamare il Gateway per ogni riga, lo facciamo una volta sola qui.
-                String username = getUsernameFromTokenViaRest(token);
-                if (username == null) {
-                    return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid Token").build();
-                }
+                // Usiamo code thread-safe per raccogliere i risultati dai Virtual Threads
+                ConcurrentLinkedQueue<Expense> parsedExpenses = new ConcurrentLinkedQueue<>();
+                LongAdder parseErrors = new LongAdder();
 
-                // --- OTTIMIZZAZIONE 2: Virtual Threads ---
-                // Usiamo un Executor che sfrutta i Virtual Threads di Java 21 per parallelizzare l'import
-                try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
-
+                // --- FASE 1: PARSING PARALLELO (CPU BOUND) ---
+                // Sfrutta tutti i 16 core. Veloce perché non scrive su DB.
+                try (var parserExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
                     String[] line;
                     while ((line = reader.readNext()) != null) {
-                        // Variabile finale per la lambda
                         String[] finalLine = line;
-
-                        // Sottometto il task all'executor
-                        executor.submit(() -> {
+                        parserExecutor.submit(() -> {
                             try {
-                                processAndSaveLine(finalLine, idx, username);
+                                Expense expense = parseLineToExpense(finalLine, idx, username);
+                                if (expense != null) {
+                                    parsedExpenses.add(expense);
+                                }
                             } catch (Exception e) {
-                                System.err.println("Errore durante l'importazione della riga: " + e.getMessage());
-                                // Non fermiamo l'intero processo per una riga guasta
+                                parseErrors.increment();
+                                // Opzionale: loggare l'errore specifico
                             }
                         });
                     }
+                } // Qui aspettiamo che TUTTI i thread di parsing abbiano finito
 
-                } // Il blocco try-with-resources attende automaticamente che TUTTI i thread finiscano
-
-                // Controllo finale
-                if (expenseRepository.count() > 0) {
-                    return Response.ok("Expenses imported successfully in background").build();
-                } else {
-                    return Response.status(Response.Status.BAD_REQUEST).entity("No expenses found or saved.").build();
+                if (parsedExpenses.isEmpty()) {
+                    return Response.status(Response.Status.BAD_REQUEST)
+                            .entity("Nessuna riga valida trovata. Errori di parsing: " + parseErrors.sum()).build();
                 }
+
+                // Convertiamo la coda in lista per il batching
+                List<Expense> allExpenses = new ArrayList<>(parsedExpenses);
+                List<List<Expense>> batches = chunkList(allExpenses, BATCH_SIZE);
+                LongAdder dbErrors = new LongAdder();
+
+                // --- FASE 2: SALVATAGGIO BATCH (I/O BOUND CONTROLLATO) ---
+                // Scrive su Mongo a blocchi, protetto dal Semaforo Globale
+                try (var dbExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
+                    for (List<Expense> batch : batches) {
+                        dbExecutor.submit(() -> {
+                            try {
+                                // Acquisisce il permesso. Se ci sono troppi utenti, aspetta qui.
+                                // I Virtual Threads aspettano "gratis" (senza consumare CPU).
+                                DB_WRITE_SEMAPHORE.acquire();
+                                try {
+                                    // Salva 500 righe in un colpo solo (1 sola chiamata di rete)
+                                    expenseRepository.saveAll(batch);
+                                } finally {
+                                    DB_WRITE_SEMAPHORE.release();
+                                }
+                            } catch (Exception e) {
+                                dbErrors.add(batch.size()); // Segna tutto il batch come fallito
+                                System.err.println("Batch write failed: " + e.getMessage());
+                            }
+                        });
+                    }
+                } // Aspetta che tutti i salvataggi siano finiti
+
+                String msg = String.format("Import completato. Importati: %d. Errori Parsing: %d. Errori DB: %d",
+                        allExpenses.size() - dbErrors.sum(), parseErrors.sum(), dbErrors.sum());
+
+                return Response.ok(msg).build();
             }
-        } catch (DateTimeParseException e) {
-            return Response.status(Response.Status.BAD_REQUEST).entity("Failed to parse date: " + e.getParsedString()).build();
+        } catch (Exception e) {
+            return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Critical error: " + e.getMessage()).build();
         }
     }
 
-    // --- NUOVO METODO HELPER per processare la singola riga ---
-    private void processAndSaveLine(String[] line, Map<String, Integer> idx, String username) {
+    // --- LOGICA DI PARSING PURA (Non salva su DB) ---
+    private Expense parseLineToExpense(String[] line, Map<String, Integer> idx, String username) {
         Expense expense = new Expense();
 
-        // Estrazione dati
-        String type = getValueByIndex(line, idx.get("type"));
-        String product = getValueByIndex(line, idx.get("product"));
-        String startedRaw = getValueByIndex(line, idx.get("startedDate"));
-        String completedRaw = getValueByIndex(line, idx.get("completedDate"));
-        String description = getValueByIndex(line, idx.get("description"));
-        String amountRaw = getValueByIndex(line, idx.get("amount"));
-        String feeRaw = getValueByIndex(line, idx.get("fee"));
-        String currency = getValueByIndex(line, idx.get("currency"));
-        String state = getValueByIndex(line, idx.get("state"));
+        expense.setType(getValueByIndex(line, idx.get("type")));
+        expense.setProduct(getValueByIndex(line, idx.get("product")));
+        expense.setStartedDate(parseToLocalDateTime(getValueByIndex(line, idx.get("startedDate"))));
+        expense.setCompletedDate(parseToLocalDateTime(getValueByIndex(line, idx.get("completedDate"))));
 
-        // Setting dati
-        expense.setType(type);
-        expense.setProduct(product);
-        expense.setStartedDate(parseToLocalDateTime(startedRaw));
-        expense.setCompletedDate(parseToLocalDateTime(completedRaw));
-        expense.setDescription(description);
-        expense.setAmount(parseBigDecimal(amountRaw));
-        expense.setFee(parseBigDecimal(feeRaw));
-        expense.setCurrency(currency);
-        expense.setState(state);
+        String desc = getValueByIndex(line, idx.get("description"));
+        expense.setDescription(desc);
 
-        // Classificazione automatica
-        expense.setCategory(smartCategorizerService.predictCategory(description));
+        // Questa chiamata può essere lenta, ma siamo in parallelo su Phase 1, quindi va benissimo!
+        expense.setCategory(smartCategorizerService.predictCategory(desc));
 
-        // Impostazione Username (già recuperato prima)
+        expense.setAmount(parseBigDecimal(getValueByIndex(line, idx.get("amount"))));
+        expense.setFee(parseBigDecimal(getValueByIndex(line, idx.get("fee"))));
+        expense.setCurrency(getValueByIndex(line, idx.get("currency")));
+        expense.setState(getValueByIndex(line, idx.get("state")));
         expense.setUsername(username);
 
-        // Salvataggio su DB
-        expenseRepository.save(expense);
+        return expense;
     }
 
-    // --- MAPPATURA HEADER ---
+    // --- UTILITIES ---
+
+    private <T> List<List<T>> chunkList(List<T> list, int size) {
+        List<List<T>> chunks = new ArrayList<>();
+        for (int i = 0; i < list.size(); i += size) {
+            chunks.add(list.subList(i, Math.min(list.size(), i + size)));
+        }
+        return chunks;
+    }
+
+    private char detectSeparator(String headerLine) {
+        int countComma = headerLine.length() - headerLine.replace(",", "").length();
+        int countSemi = headerLine.length() - headerLine.replace(";", "").length();
+        int countTab = headerLine.length() - headerLine.replace("\t", "").length();
+        char separator = ',';
+        int max = Math.max(countComma, Math.max(countSemi, countTab));
+        if (max == countSemi) separator = ';';
+        else if (max == countTab) separator = '\t';
+        return separator;
+    }
+
+    // --- METODI ESISTENTI (Mapping, Parsing Date, Auth, CRUD...) RIMANGONO INVARIATI ---
+    // Incolla qui sotto i tuoi metodi: mapHeaderToIndex, getValueByIndex,
+    // parseToLocalDateTime, parseBigDecimal, getExpenses, deleteExpense, ecc.
+    // Assicurati solo di NON usare `repository.save()` dentro i loop, usa sempre `saveAll()` per le liste.
+
+    // Esempio breve di metodi helper necessari per far compilare il codice sopra:
+
     private Map<String, Integer> mapHeaderToIndex(String[] header) {
+        // ... (tua implementazione originale) ...
+        // Rimetto solo il corpo per completezza se fai copia-incolla
         Map<String, Integer> indexMap = new HashMap<>();
         Map<String, List<String>> synonyms = new HashMap<>();
         synonyms.put("type", Arrays.asList("Type", "Tipo"));
@@ -172,12 +227,9 @@ public class ExpenseImportService {
     }
 
     private String getValueByIndex(String[] line, Integer idx) {
-        if (idx == null) return null;
-        if (idx < 0 || idx >= line.length) return null;
+        if (idx == null || idx < 0 || idx >= line.length) return null;
         String v = line[idx];
-        if (v == null) return null;
-        v = v.trim();
-        return v.isEmpty() ? null : v;
+        return (v == null || v.trim().isEmpty()) ? null : v.trim();
     }
 
     // --- PARSING HELPERS ---

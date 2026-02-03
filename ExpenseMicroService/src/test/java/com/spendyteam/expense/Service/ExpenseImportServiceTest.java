@@ -6,7 +6,6 @@ import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
@@ -21,6 +20,7 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class ExpenseImportServiceTest {
@@ -43,13 +43,28 @@ class ExpenseImportServiceTest {
     @Mock
     private WebClient.ResponseSpec responseSpec;
 
-    @InjectMocks
     private ExpenseImportService expenseImportService;
 
     private Expense mockExpense;
 
     @BeforeEach
     void setUp() {
+        // Istanziamo manualmente il servizio con il WebClient mockato
+        expenseImportService = new ExpenseImportService(webClient);
+
+        // Inietta manualmente repository e smartCategorizer usando reflection
+        try {
+            java.lang.reflect.Field repoField = ExpenseImportService.class.getDeclaredField("expenseRepository");
+            repoField.setAccessible(true);
+            repoField.set(expenseImportService, expenseRepository);
+
+            java.lang.reflect.Field smartField = ExpenseImportService.class.getDeclaredField("smartCategorizerService");
+            smartField.setAccessible(true);
+            smartField.set(expenseImportService, smartCategorizerService);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+
         mockExpense = new Expense();
         mockExpense.setType("Payment");
         mockExpense.setProduct("Netflix");
@@ -63,7 +78,7 @@ class ExpenseImportServiceTest {
         mockExpense.setCategory("Abbonamenti e Servizi Digitali");
         mockExpense.setUsername("testuser");
 
-        // Setup WebClient mocks
+        // Setup WebClient mocks - lenient perché non tutti i test li usano
         lenient().when(webClient.post()).thenReturn(requestBodyUriSpec);
         lenient().when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
         lenient().when(requestBodySpec.bodyValue(any())).thenAnswer(invocation -> requestBodySpec);
@@ -96,7 +111,7 @@ class ExpenseImportServiceTest {
             csvContent.getBytes()
         );
 
-        // Mock unauthorized response
+        // Mock unauthorized response - ritorna mappa senza username
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
 
         Response response = expenseImportService.importExpensesFromCsv(file, "invalid-token");
