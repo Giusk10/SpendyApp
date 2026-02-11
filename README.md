@@ -9,14 +9,6 @@ license: agpl-3.0
 app_port: 7860
 ---
 
-Certamente. Ho aggiornato il **README.md** rimuovendo ogni riferimento a coinquilini, gruppi o condivisione delle spese.
-
-La descrizione ora riflette un'applicazione di **Personal Finance Management**, focalizzata sul tracciamento individuale, la sicurezza dei dati personali e l'analisi automatizzata delle abitudini di spesa.
-
-Ecco il contenuto pronto per essere copiato:
-
----
-
 # 🏠 SpendyApp
 
 **SpendyApp** è una piattaforma moderna a microservizi progettata per la **gestione finanziaria personale**. L'applicazione permette agli utenti di tenere traccia delle proprie spese quotidiane, importare storici bancari e analizzare i flussi di cassa in modo sicuro ed efficiente.
