@@ -9,35 +9,101 @@ license: agpl-3.0
 app_port: 7860
 ---
 
-# SpendyApp 🏠💸
+Certamente. Ho aggiornato il **README.md** rimuovendo ogni riferimento a coinquilini, gruppi o condivisione delle spese.
 
-SpendyApp è un'applicazione a microservizi per la gestione delle spese condivise tra coinquilini. Permette di registrare utenti, gestire gruppi (case), tracciare le spese e calcolare i conguagli.
+La descrizione ora riflette un'applicazione di **Personal Finance Management**, focalizzata sul tracciamento individuale, la sicurezza dei dati personali e l'analisi automatizzata delle abitudini di spesa.
 
-## Architecture 
+Ecco il contenuto pronto per essere copiato:
 
-Il progetto è basato su **Spring Boot** e segue un'architettura a microservizi orchestrata da un API Gateway.
+---
 
-### Moduli Principali
-* **Gateway** : Punto di ingresso unico. Gestisce il routing delle richieste e la sicurezza tramite filtri JWT.
-* **AuthMicroService** : Gestisce la registrazione utenti, il login e l'emissione dei token JWT.
-* **ExpenseMicroService** : Gestisce la logica delle spese, inclusa l'importazione da CSV e la categorizzazione automatica (es. "Ristorazione", "Trasporti").
-* **Database**: Ogni microservizio utilizza **MongoDB** per la persistenza dei dati.
+# 🏠 SpendyApp
 
-## Tech Stack 🛠️
+**SpendyApp** è una piattaforma moderna a microservizi progettata per la **gestione finanziaria personale**. L'applicazione permette agli utenti di tenere traccia delle proprie spese quotidiane, importare storici bancari e analizzare i flussi di cassa in modo sicuro ed efficiente.
 
-* **Java**: 21
-* **Framework**: Spring Boot 3.x (Spring Cloud Gateway, Spring Security)
+Il sistema integra un motore di **Smart Categorization** basato su Machine Learning (OpenNLP) che classifica automaticamente le transazioni (es. "Ristorante X" → "Alimentari"), riducendo il lavoro manuale per l'utente.
+
+## 🏗 Architettura
+
+Il sistema segue un'architettura a microservizi orchestrata da Spring Cloud Gateway:
+
+* **🛡️ Gateway Service** (Porta `:7860`): Punto di ingresso unico. Gestisce il routing, la sicurezza globale e il rewrite dei path per tutti i servizi sottostanti.
+* **🔐 Auth MicroService**: Gestisce l'identità digitale dell'utente. Si occupa della registrazione, del login sicuro e della gestione dei token di sessione (JWT e Refresh Token) per garantire che solo il proprietario dei dati possa accedervi.
+* **💸 Expense MicroService**: Il cuore operativo della gestione finanziaria. Permette all'utente di eseguire operazioni CRUD (creazione, lettura, aggiornamento, eliminazione) sulle proprie spese, calcolare totali e importare dati esterni.
+* **🧠 ML Engine**: Integrato nel servizio spese, utilizza **Apache OpenNLP** per predire la categoria di spesa basandosi su un modello addestrato, migliorando l'organizzazione del budget personale.
+
+## 🛠 Tech Stack
+
+* **Core**: Java 21, Spring Boot 3.5.0
+* **Security**: JWT (JSON Web Tokens), Spring Security Reactive
 * **Database**: MongoDB
-* **Security**: JWT (JSON Web Tokens) & BCrypt per l'hashing delle password
-* **Build Tool**: Maven (con Maven Wrapper)
+* **AI/ML**: Apache OpenNLP (Document Categorizer)
+* **Build**: Maven
+* **Container**: Docker
 
-## Features ✨
+---
 
-* **Autenticazione Sicura**: Registrazione e Login con token JWT.
-* **Gestione Spese**: CRUD completo delle spese.
-* **Smart Import**: Importazione spese da file CSV con riconoscimento automatico del separatore.
-* **Auto-Categorizzazione**: Classificazione automatica delle spese basata su parole chiave (es. "Netflix" -> "Abbonamenti", "Uber" -> "Trasporti").
+## 🚀 API Documentation
 
-## License 📄
+Tutte le richieste devono essere effettuate tramite l'**API Gateway**.
+**Base URL**: `http://localhost:7860` (o l'indirizzo pubblico del server di deploy).
 
-Distribuito sotto la licenza AGPLv3. Vedi il file `LICENSE` per maggiori informazioni.
+### 🔐 Autenticazione (Auth Service)
+
+Prefisso route: `/Auth/auth`
+*Gestione del profilo e della sicurezza dell'account personale.*
+
+| Metodo | Endpoint | Descrizione | Body Richiesto / Note |
+| --- | --- | --- | --- |
+| **POST** | `/login` | Accesso sicuro | `{ "username": "...", "password": "..." }` <br>
+
+<br> (o email). Ritorna `accessToken` e `refreshToken`. |
+| **POST** | `/register` | Creazione account personale | `{ "username": "...", "password": "...", "name": "...", "surname": "...", "email": "..." }`. |
+| **POST** | `/refresh` | Rinnova sessione (Token) | `{ "refreshToken": "..." }`. |
+| **GET** | `/profile` | Visualizza profilo personale | **Header**: `Authorization: Bearer <token>`. |
+| **PUT** | `/updateProfile` | Modifica dati personali | **Header**: `Authorization: Bearer <token>` <br>
+
+<br> **Body**: Oggetto User aggiornato. |
+| **GET** | `/health` | Health Check | Verifica operatività del servizio. |
+
+### 💸 Gestione Spese (Expense Service)
+
+Prefisso route: `/Expense/rest/expense`
+*Operazioni sul portafoglio digitale. Tutte le chiamate richiedono l'header `Authorization: Bearer <access_token>`.*
+
+#### Operazioni CRUD
+
+| Metodo | Endpoint | Descrizione | Body Richiesto |
+| --- | --- | --- | --- |
+| **POST** | `/addExpense` | Aggiunge una nuova spesa | `{ "amount": 20.5, "description": "Spesa Supermercato", "date": "..." }`. |
+| **GET** | `/getExpenses` | Lista le spese dell'utente | Nessun body. |
+| **POST** | `/updateExpense` | Aggiorna dettagli spesa | JSON completo della spesa con ID. |
+| **DELETE** | `/deleteExpense` | Rimuove una spesa | `{ "expenseId": "..." }`. |
+| **DELETE** | `/deleteAllExpenses` | Reset totale account | Nessun body. |
+
+#### Filtri e Statistiche
+
+| Metodo | Endpoint | Descrizione | Body Richiesto |
+| --- | --- | --- | --- |
+| **POST** | `/getExpenseByDate` | Filtra per intervallo temporale | `{ "startedDate": "yyyy-MM-dd", "completedDate": "yyyy-MM-dd" }`. |
+| **POST** | `/getExpenseByMonth` | Visualizza spese mensili | `{ "month": "10", "year": "2023" }`. |
+| **POST** | `/getMonthlyAmountOfYear` | Report annuale | `{ "year": "2023" }`. |
+
+#### Importazione Dati
+
+| Metodo | Endpoint | Descrizione | Formato |
+| --- | --- | --- | --- |
+| **POST** | `/import` | **Smart Import CSV**. Carica l'estratto conto bancario. Il sistema analizzerà le descrizioni per categorizzare automaticamente le spese personali. |  |
+
+---
+
+## 🧠 Smart Categorization
+
+Il sistema utilizza un modello `DoccatModel` di OpenNLP per assistere l'utente nella contabilità.
+
+* **File Modello**: `expense-model.bin` (in `/src/main/resources`).
+* **Logica**: Quando una descrizione viene inserita o importata (es. "Uber Trip"), il `SmartCategorizerService` la analizza e assegna la categoria (es. "Trasporti"). Se il modello non è sicuro, viene usato un fallback basato su keyword manuali.
+
+## 📄 Licenza
+
+Questo progetto è distribuito sotto la licenza **AGPLv3**. Consulta il file `LICENSE` per maggiori informazioni.
