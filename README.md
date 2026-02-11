@@ -19,7 +19,7 @@ Il sistema integra un motore di **Smart Categorization** basato su Machine Learn
 
 Il sistema segue un'architettura a microservizi orchestrata da Spring Cloud Gateway:
 
-* **🛡️ Gateway Service** (Porta `:7860`): Punto di ingresso unico. Gestisce il routing, la sicurezza globale e il rewrite dei path per tutti i servizi sottostanti.
+* **🛡️ Gateway Service**: Punto di ingresso unico. Gestisce il routing, la sicurezza globale e il rewrite dei path per tutti i servizi sottostanti.
 * **🔐 Auth MicroService**: Gestisce l'identità digitale dell'utente. Si occupa della registrazione, del login sicuro e della gestione dei token di sessione (JWT e Refresh Token) per garantire che solo il proprietario dei dati possa accedervi.
 * **💸 Expense MicroService**: Il cuore operativo della gestione finanziaria. Permette all'utente di eseguire operazioni CRUD (creazione, lettura, aggiornamento, eliminazione) sulle proprie spese, calcolare totali e importare dati esterni.
 * **🧠 ML Engine**: Integrato nel servizio spese, utilizza **Apache OpenNLP** per predire la categoria di spesa basandosi su un modello addestrato, migliorando l'organizzazione del budget personale.
@@ -38,7 +38,7 @@ Il sistema segue un'architettura a microservizi orchestrata da Spring Cloud Gate
 ## 🚀 API Documentation
 
 Tutte le richieste devono essere effettuate tramite l'**API Gateway**.
-**Base URL**: `http://localhost:7860` (o l'indirizzo pubblico del server di deploy).
+**Base URL**: `https://khondor03-Spendy.hf.space`.
 
 ### 🔐 Autenticazione (Auth Service)
 
