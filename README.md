@@ -35,6 +35,44 @@ Il sistema segue un'architettura a microservizi orchestrata da Spring Cloud Gate
 
 ---
 
+Markdown
+---
+title: Spendy
+emoji: 🏆
+colorFrom: green
+colorTo: pink
+sdk: docker
+pinned: false
+license: agpl-3.0
+app_port: 7860
+---
+
+# 🏠 SpendyApp
+
+**SpendyApp** è una piattaforma moderna a microservizi progettata per la **gestione finanziaria personale**. L'applicazione permette agli utenti di tenere traccia delle proprie spese quotidiane, importare storici bancari e analizzare i flussi di cassa in modo sicuro ed efficiente.
+
+Il sistema integra un motore di **Smart Categorization** basato su Machine Learning (OpenNLP) che classifica automaticamente le transazioni (es. "Ristorante X" → "Alimentari"), riducendo il lavoro manuale per l'utente.
+
+## 🏗 Architettura
+
+Il sistema segue un'architettura a microservizi orchestrata da Spring Cloud Gateway:
+
+* **🛡️ Gateway Service**: Punto di ingresso unico. Gestisce il routing, la sicurezza globale e il rewrite dei path per tutti i servizi sottostanti.
+* **🔐 Auth MicroService**: Gestisce l'identità digitale dell'utente. Si occupa della registrazione, del login sicuro e della gestione dei token di sessione (JWT e Refresh Token) per garantire che solo il proprietario dei dati possa accedervi.
+* **💸 Expense MicroService**: Il cuore operativo della gestione finanziaria. Permette all'utente di eseguire operazioni CRUD (creazione, lettura, aggiornamento, eliminazione) sulle proprie spese, calcolare totali e importare dati esterni.
+* **🧠 ML Engine**: Integrato nel servizio spese, utilizza **Apache OpenNLP** per predire la categoria di spesa basandosi su un modello addestrato, migliorando l'organizzazione del budget personale.
+
+## 🛠 Tech Stack
+
+* **Core**: Java 21, Spring Boot 3.5.0
+* **Security**: JWT (JSON Web Tokens), Spring Security Reactive
+* **Database**: MongoDB
+* **AI/ML**: Apache OpenNLP (Document Categorizer)
+* **Build**: Maven
+* **Container**: Docker
+
+---
+
 ## 🚀 API Documentation
 
 Tutte le richieste devono essere effettuate tramite l'**API Gateway**.
@@ -46,16 +84,12 @@ Prefisso route: `/Auth/auth`
 *Gestione del profilo e della sicurezza dell'account personale.*
 
 | Metodo | Endpoint | Descrizione | Body Richiesto / Note |
-| --- | --- | --- | --- |
-| **POST** | `/login` | Accesso sicuro | `{ "username": "...", "password": "..." }` <br>
-
-<br> (o email). Ritorna `accessToken` e `refreshToken`. |
-| **POST** | `/register` | Creazione account personale | `{ "username": "...", "password": "...", "name": "...", "surname": "...", "email": "..." }`. |
-| **POST** | `/refresh` | Rinnova sessione (Token) | `{ "refreshToken": "..." }`. |
-| **GET** | `/profile` | Visualizza profilo personale | **Header**: `Authorization: Bearer <token>`. |
-| **PUT** | `/updateProfile` | Modifica dati personali | **Header**: `Authorization: Bearer <token>` <br>
-
-<br> **Body**: Oggetto User aggiornato. |
+| :--- | :--- | :--- | :--- |
+| **POST** | `/login` | Accesso sicuro | `{ "username": "...", "password": "..." }` <br> (o email). Ritorna `accessToken` e `refreshToken`. |
+| **POST** | `/register` | Creazione account personale | `{ "username": "...", "password": "...", "name": "...", "surname": "...", "email": "..." }` |
+| **POST** | `/refresh` | Rinnova sessione (Token) | `{ "refreshToken": "..." }` |
+| **GET** | `/profile` | Visualizza profilo personale | **Header**: `Authorization: Bearer <token>` |
+| **PUT** | `/updateProfile` | Modifica dati personali | **Header**: `Authorization: Bearer <token>` <br> **Body**: Oggetto User aggiornato. |
 | **GET** | `/health` | Health Check | Verifica operatività del servizio. |
 
 ### 💸 Gestione Spese (Expense Service)
