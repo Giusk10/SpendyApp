@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
-class ExpenseImportServiceTest {
+class ExpenseServiceTest {
 
     @Mock
     private IExpenseRepository expenseRepository;
@@ -43,24 +43,22 @@ class ExpenseImportServiceTest {
     @Mock
     private WebClient.ResponseSpec responseSpec;
 
-    private ExpenseImportService expenseImportService;
+    private ExpenseService expenseService;
 
     private Expense mockExpense;
 
     @BeforeEach
     void setUp() {
-        // Istanziamo manualmente il servizio con il WebClient mockato
-        expenseImportService = new ExpenseImportService(webClient);
+        expenseService = new ExpenseService(webClient);
 
-        // Inietta manualmente repository e smartCategorizer usando reflection
         try {
-            java.lang.reflect.Field repoField = ExpenseImportService.class.getDeclaredField("expenseRepository");
+            java.lang.reflect.Field repoField = ExpenseService.class.getDeclaredField("expenseRepository");
             repoField.setAccessible(true);
-            repoField.set(expenseImportService, expenseRepository);
+            repoField.set(expenseService, expenseRepository);
 
-            java.lang.reflect.Field smartField = ExpenseImportService.class.getDeclaredField("smartCategorizerService");
+            java.lang.reflect.Field smartField = ExpenseService.class.getDeclaredField("smartCategorizerService");
             smartField.setAccessible(true);
-            smartField.set(expenseImportService, smartCategorizerService);
+            smartField.set(expenseService, smartCategorizerService);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -78,7 +76,7 @@ class ExpenseImportServiceTest {
         mockExpense.setCategory("Abbonamenti e Servizi Digitali");
         mockExpense.setUsername("testuser");
 
-        // Setup WebClient mocks - lenient perché non tutti i test li usano
+        // Setup WebClient mocks - lenient because not all tests use them
         lenient().when(webClient.post()).thenReturn(requestBodyUriSpec);
         lenient().when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
         lenient().when(requestBodySpec.bodyValue(any())).thenAnswer(invocation -> requestBodySpec);
@@ -94,7 +92,7 @@ class ExpenseImportServiceTest {
             new byte[0]
         );
 
-        Response response = expenseImportService.importExpensesFromCsv(emptyFile, "test-token");
+        Response response = expenseService.importExpensesFromCsv(emptyFile, "test-token");
 
         assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     }
@@ -111,10 +109,9 @@ class ExpenseImportServiceTest {
             csvContent.getBytes()
         );
 
-        // Mock unauthorized response - ritorna mappa senza username
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
 
-        Response response = expenseImportService.importExpensesFromCsv(file, "invalid-token");
+        Response response = expenseService.importExpensesFromCsv(file, "invalid-token");
 
         assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
     }
@@ -129,7 +126,7 @@ class ExpenseImportServiceTest {
         when(expenseRepository.findByUsername(eq("testuser"), any(Sort.class)))
             .thenReturn(List.of(mockExpense));
 
-        Response response = expenseImportService.getExpenses(token);
+        Response response = expenseService.getExpenses(token);
 
         assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
         assertNotNull(response.getEntity());
@@ -141,7 +138,7 @@ class ExpenseImportServiceTest {
 
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
 
-        Response response = expenseImportService.getExpenses(token);
+        Response response = expenseService.getExpenses(token);
 
         assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
     }
@@ -156,7 +153,7 @@ class ExpenseImportServiceTest {
         when(expenseRepository.findByUsername(eq("testuser"), any(Sort.class)))
             .thenReturn(Collections.emptyList());
 
-        Response response = expenseImportService.getExpenses(token);
+        Response response = expenseService.getExpenses(token);
 
         assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     }
@@ -171,12 +168,31 @@ class ExpenseImportServiceTest {
         authResponse.put("username", "testuser");
 
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
-        when(expenseRepository.findByUsername("testuser"))
+        when(expenseRepository.findExpensesByDateRange(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(List.of(mockExpense));
 
-        Response response = expenseImportService.getExpenseByDate(startDate, endDate, token);
+        Response response = expenseService.getExpenseByDate(startDate, endDate, token);
 
-        assertNotNull(response);
+        assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        assertNotNull(response.getEntity());
+    }
+
+    @Test
+    void testGetExpenseByDateNoContent() {
+        String token = "valid-token";
+        String startDate = "2024-01-01";
+        String endDate = "2024-01-31";
+
+        Map<String, String> authResponse = new HashMap<>();
+        authResponse.put("username", "testuser");
+
+        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(expenseRepository.findExpensesByDateRange(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(Collections.emptyList());
+
+        Response response = expenseService.getExpenseByDate(startDate, endDate, token);
+
+        assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     }
 
     @Test
@@ -187,7 +203,7 @@ class ExpenseImportServiceTest {
 
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
 
-        Response response = expenseImportService.getExpenseByDate(startDate, endDate, token);
+        Response response = expenseService.getExpenseByDate(startDate, endDate, token);
 
         assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
     }
@@ -202,12 +218,31 @@ class ExpenseImportServiceTest {
         authResponse.put("username", "testuser");
 
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
-        when(expenseRepository.findByUsername("testuser"))
+        when(expenseRepository.findExpensesByDateRange(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(List.of(mockExpense));
 
-        Response response = expenseImportService.getExpenseByMonth_Year(month, year, token);
+        Response response = expenseService.getExpenseByMonth_Year(month, year, token);
 
-        assertNotNull(response);
+        assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        assertNotNull(response.getEntity());
+    }
+
+    @Test
+    void testGetExpenseByMonthYearNoContent() {
+        String token = "valid-token";
+        String month = "01";
+        String year = "2024";
+
+        Map<String, String> authResponse = new HashMap<>();
+        authResponse.put("username", "testuser");
+
+        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(expenseRepository.findExpensesByDateRange(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(Collections.emptyList());
+
+        Response response = expenseService.getExpenseByMonth_Year(month, year, token);
+
+        assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     }
 
     @Test
@@ -218,21 +253,43 @@ class ExpenseImportServiceTest {
         Map<String, String> authResponse = new HashMap<>();
         authResponse.put("username", "testuser");
 
-        Expense expense1 = new Expense();
-        expense1.setStartedDate(LocalDateTime.of(2024, 1, 15, 10, 0));
-        expense1.setAmount(new BigDecimal("-50.00"));
+        com.spendyteam.expense.DTO.MonthlyExpenseTotal total1 = mock(com.spendyteam.expense.DTO.MonthlyExpenseTotal.class);
+        when(total1.getMonthKey()).thenReturn("2024-01");
+        when(total1.getTotalAmount()).thenReturn(new BigDecimal("-50.00"));
 
-        Expense expense2 = new Expense();
-        expense2.setStartedDate(LocalDateTime.of(2024, 2, 10, 14, 0));
-        expense2.setAmount(new BigDecimal("-75.00"));
+        com.spendyteam.expense.DTO.MonthlyExpenseTotal total2 = mock(com.spendyteam.expense.DTO.MonthlyExpenseTotal.class);
+        when(total2.getMonthKey()).thenReturn("2024-02");
+        when(total2.getTotalAmount()).thenReturn(new BigDecimal("-75.00"));
 
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
-        when(expenseRepository.findByUsername("testuser"))
-            .thenReturn(Arrays.asList(expense1, expense2));
+        when(expenseRepository.aggregateMonthlyExpenses(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(Arrays.asList(total1, total2));
 
-        Response response = expenseImportService.getMonthly_Amount_of_Year(year, token);
+        Response response = expenseService.getMonthly_Amount_of_Year(year, token);
 
-        assertNotNull(response);
+        assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+        assertNotNull(response.getEntity());
+        assertTrue(response.getEntity() instanceof Map);
+        Map<?, ?> result = (Map<?, ?>) response.getEntity();
+        assertEquals(new BigDecimal("-50.00"), result.get("2024-01"));
+        assertEquals(new BigDecimal("-75.00"), result.get("2024-02"));
+    }
+
+    @Test
+    void testGetMonthlyAmountOfYearNoContent() {
+        String token = "valid-token";
+        String year = "2024";
+
+        Map<String, String> authResponse = new HashMap<>();
+        authResponse.put("username", "testuser");
+
+        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(expenseRepository.aggregateMonthlyExpenses(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(Collections.emptyList());
+
+        Response response = expenseService.getMonthly_Amount_of_Year(year, token);
+
+        assertEquals(Response.Status.NO_CONTENT.getStatusCode(), response.getStatus());
     }
 
     @Test
@@ -246,7 +303,7 @@ class ExpenseImportServiceTest {
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
         when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(mockExpense));
 
-        Response response = expenseImportService.deleteExpense(expenseId, token);
+        Response response = expenseService.deleteExpense(expenseId, token);
 
         assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
         verify(expenseRepository).deleteById(expenseId);
@@ -263,7 +320,7 @@ class ExpenseImportServiceTest {
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
         when(expenseRepository.findById(expenseId)).thenReturn(Optional.empty());
 
-        Response response = expenseImportService.deleteExpense(expenseId, token);
+        Response response = expenseService.deleteExpense(expenseId, token);
 
         assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     }
@@ -282,7 +339,7 @@ class ExpenseImportServiceTest {
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
         when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(otherUserExpense));
 
-        Response response = expenseImportService.deleteExpense(expenseId, token);
+        Response response = expenseService.deleteExpense(expenseId, token);
 
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
     }
@@ -309,7 +366,7 @@ class ExpenseImportServiceTest {
             .thenReturn("Abbonamenti e Servizi Digitali");
         when(expenseRepository.save(any(Expense.class))).thenReturn(mockExpense);
 
-        Response response = expenseImportService.addExpense(body, token);
+        Response response = expenseService.addExpense(body, token);
 
         assertEquals(Response.Status.CREATED.getStatusCode(), response.getStatus());
         verify(expenseRepository).save(any(Expense.class));
@@ -322,7 +379,7 @@ class ExpenseImportServiceTest {
 
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
 
-        Response response = expenseImportService.addExpense(body, token);
+        Response response = expenseService.addExpense(body, token);
 
         assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
     }
@@ -344,7 +401,7 @@ class ExpenseImportServiceTest {
             .thenReturn("Abbonamenti e Servizi Digitali");
         when(expenseRepository.save(any(Expense.class))).thenReturn(mockExpense);
 
-        Response response = expenseImportService.updateExpense(body, token);
+        Response response = expenseService.updateExpense(body, token);
 
         assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
         verify(expenseRepository).save(any(Expense.class));
@@ -358,7 +415,7 @@ class ExpenseImportServiceTest {
 
         when(expenseRepository.findById("nonexistent")).thenReturn(Optional.empty());
 
-        Response response = expenseImportService.updateExpense(body, token);
+        Response response = expenseService.updateExpense(body, token);
 
         assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
     }
@@ -367,7 +424,7 @@ class ExpenseImportServiceTest {
     void testUpdateExpenseMissingId() {
         Map<String, String> body = new HashMap<>();
 
-        Response response = expenseImportService.updateExpense(body, "valid-token");
+        Response response = expenseService.updateExpense(body, "valid-token");
 
         assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
     }
@@ -387,7 +444,7 @@ class ExpenseImportServiceTest {
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
         when(expenseRepository.findById("expense123")).thenReturn(Optional.of(otherUserExpense));
 
-        Response response = expenseImportService.updateExpense(body, token);
+        Response response = expenseService.updateExpense(body, token);
 
         assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
     }
@@ -402,7 +459,7 @@ class ExpenseImportServiceTest {
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
         when(expenseRepository.deleteByUsername("testuser")).thenReturn(5L);
 
-        Response response = expenseImportService.deleteAllExpenses(token);
+        Response response = expenseService.deleteAllExpenses(token);
 
         assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
         verify(expenseRepository).deleteByUsername("testuser");
@@ -418,7 +475,7 @@ class ExpenseImportServiceTest {
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
         when(expenseRepository.deleteByUsername("testuser")).thenReturn(0L);
 
-        Response response = expenseImportService.deleteAllExpenses(token);
+        Response response = expenseService.deleteAllExpenses(token);
 
         assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     }
@@ -429,9 +486,8 @@ class ExpenseImportServiceTest {
 
         when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
 
-        Response response = expenseImportService.deleteAllExpenses(token);
+        Response response = expenseService.deleteAllExpenses(token);
 
         assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
     }
 }
-

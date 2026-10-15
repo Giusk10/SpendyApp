@@ -323,5 +323,57 @@ class IExpenseRepositoryTest {
         assertEquals(0, count);
         verify(expenseRepository, times(1)).deleteAll();
     }
+
+    @Test
+    @DisplayName("Trova spese per intervallo di date")
+    void testFindExpensesByDateRange() {
+        LocalDateTime start = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime end = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+        when(expenseRepository.findExpensesByDateRange("user1", start, end))
+                .thenReturn(List.of(expense1));
+
+        List<Expense> result = expenseRepository.findExpensesByDateRange("user1", start, end);
+
+        assertEquals(1, result.size());
+        assertEquals("user1", result.get(0).getUsername());
+        verify(expenseRepository, times(1)).findExpensesByDateRange("user1", start, end);
+    }
+
+    @Test
+    @DisplayName("Aggrega spese mensili")
+    void testAggregateMonthlyExpenses() {
+        LocalDateTime start = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime end = LocalDateTime.of(2024, 12, 31, 23, 59, 59);
+
+        com.spendyteam.expense.DTO.MonthlyExpenseTotal mockTotal = mock(com.spendyteam.expense.DTO.MonthlyExpenseTotal.class);
+        when(mockTotal.getMonthKey()).thenReturn("2024-01");
+        when(mockTotal.getTotalAmount()).thenReturn(new BigDecimal("-15.99"));
+
+        when(expenseRepository.aggregateMonthlyExpenses("user1", start, end))
+                .thenReturn(List.of(mockTotal));
+
+        List<com.spendyteam.expense.DTO.MonthlyExpenseTotal> result =
+                expenseRepository.aggregateMonthlyExpenses("user1", start, end);
+
+        assertEquals(1, result.size());
+        assertEquals("2024-01", result.get(0).getMonthKey());
+        assertEquals(new BigDecimal("-15.99"), result.get(0).getTotalAmount());
+        verify(expenseRepository, times(1)).aggregateMonthlyExpenses("user1", start, end);
+    }
+
+    @Test
+    @DisplayName("Trova spese con paginazione")
+    void testFindByUsernamePageable() {
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+        org.springframework.data.domain.Page<Expense> page = new org.springframework.data.domain.PageImpl<>(List.of(expense1));
+
+        when(expenseRepository.findByUsername("user1", pageable)).thenReturn(page);
+
+        org.springframework.data.domain.Page<Expense> result = expenseRepository.findByUsername("user1", pageable);
+
+        assertEquals(1, result.getTotalElements());
+        assertEquals(1, result.getContent().size());
+        verify(expenseRepository, times(1)).findByUsername("user1", pageable);
+    }
 }
 

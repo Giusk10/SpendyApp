@@ -127,4 +127,85 @@ public class ExpenseJpaPersistenceIntegrationTest {
         assertEquals(1, deleted);
         assertTrue(expenseRepository.findByUsername("delete_user").isEmpty());
     }
+
+    @Test
+    @DisplayName("Should aggregate monthly expenses in database skipping positive amounts and other users")
+    void testAggregateMonthlyExpenses() {
+        // Month 1: two negative expenses and one positive income (which must be skipped)
+        Expense jan1 = new Expense();
+        jan1.setStartedDate(LocalDateTime.of(2026, 1, 10, 10, 0));
+        jan1.setCompletedDate(LocalDateTime.of(2026, 1, 10, 10, 30));
+        jan1.setAmount(new BigDecimal("-50.00"));
+        jan1.setUsername("agg_user");
+
+        Expense jan2 = new Expense();
+        jan2.setStartedDate(LocalDateTime.of(2026, 1, 20, 15, 0));
+        jan2.setCompletedDate(LocalDateTime.of(2026, 1, 20, 15, 30));
+        jan2.setAmount(new BigDecimal("-25.50"));
+        jan2.setUsername("agg_user");
+
+        Expense janIncome = new Expense();
+        janIncome.setStartedDate(LocalDateTime.of(2026, 1, 5, 8, 0));
+        janIncome.setCompletedDate(LocalDateTime.of(2026, 1, 5, 8, 30));
+        janIncome.setAmount(new BigDecimal("500.00")); // Positive income should be filtered out
+        janIncome.setUsername("agg_user");
+
+        // Month 2: one negative expense
+        Expense feb1 = new Expense();
+        feb1.setStartedDate(LocalDateTime.of(2026, 2, 14, 19, 0));
+        feb1.setCompletedDate(LocalDateTime.of(2026, 2, 14, 21, 0));
+        feb1.setAmount(new BigDecimal("-100.00"));
+        feb1.setUsername("agg_user");
+
+        // Different user in Jan: must NOT be included in agg_user totals
+        Expense otherUser = new Expense();
+        otherUser.setStartedDate(LocalDateTime.of(2026, 1, 15, 12, 0));
+        otherUser.setCompletedDate(LocalDateTime.of(2026, 1, 15, 12, 30));
+        otherUser.setAmount(new BigDecimal("-80.00"));
+        otherUser.setUsername("other_user");
+
+        // Different year (2025): must NOT be included in 2026 totals
+        Expense prevYear = new Expense();
+        prevYear.setStartedDate(LocalDateTime.of(2025, 12, 20, 12, 0));
+        prevYear.setCompletedDate(LocalDateTime.of(2025, 12, 20, 12, 30));
+        prevYear.setAmount(new BigDecimal("-45.00"));
+        prevYear.setUsername("agg_user");
+
+        expenseRepository.saveAll(List.of(jan1, jan2, janIncome, feb1, otherUser, prevYear));
+
+        LocalDateTime start = LocalDateTime.of(2026, 1, 1, 0, 0, 0);
+        LocalDateTime end = LocalDateTime.of(2026, 12, 31, 23, 59, 59);
+
+        List<com.spendyteam.expense.DTO.MonthlyExpenseTotal> totals =
+                expenseRepository.aggregateMonthlyExpenses("agg_user", start, end);
+
+        assertNotNull(totals);
+        assertEquals(2, totals.size());
+
+        assertEquals("2026-01", totals.get(0).getMonthKey());
+        assertEquals(new BigDecimal("-75.50"), totals.get(0).getTotalAmount());
+
+        assertEquals("2026-02", totals.get(1).getMonthKey());
+        assertEquals(new BigDecimal("-100.00"), totals.get(1).getTotalAmount());
+    }
+
+    @Test
+    @DisplayName("Should paginate user expenses using Spring Data Pageable")
+    void testPaginationByUsername() {
+        for (int i = 1; i <= 5; i++) {
+            Expense e = new Expense();
+            e.setStartedDate(LocalDateTime.of(2026, 3, i, 10, 0));
+            e.setCompletedDate(LocalDateTime.of(2026, 3, i, 10, 30));
+            e.setAmount(new BigDecimal("-" + i + "0.00"));
+            e.setUsername("page_user");
+            expenseRepository.save(e);
+        }
+
+        org.springframework.data.domain.Page<Expense> firstPage =
+                expenseRepository.findByUsername("page_user", org.springframework.data.domain.PageRequest.of(0, 2));
+
+        assertEquals(5, firstPage.getTotalElements());
+        assertEquals(3, firstPage.getTotalPages());
+        assertEquals(2, firstPage.getContent().size());
+    }
 }

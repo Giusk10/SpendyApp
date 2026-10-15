@@ -1,6 +1,6 @@
 package com.spendyteam.expense.Controller;
 
-import com.spendyteam.expense.Service.ExpenseImportService;
+import com.spendyteam.expense.Service.ExpenseService;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
 class ExpenseControllerTest {
 
     @Mock
-    private ExpenseImportService expenseService;
+    private ExpenseService expenseService;
 
     @InjectMocks
     private ExpenseController expenseController;

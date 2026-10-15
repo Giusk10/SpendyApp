@@ -2,7 +2,7 @@ package com.spendyteam.expense.Controller;
 
 import com.spendyteam.expense.DTO.*;
 import com.spendyteam.expense.Data.Expense;
-import com.spendyteam.expense.Service.ExpenseImportService;
+import com.spendyteam.expense.Service.ExpenseService;
 import com.spendyteam.expense.Utility.ExpenseResult;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,7 +28,7 @@ import java.util.Map;
 public class ExpenseController {
 
     @Autowired
-    private ExpenseImportService expenseService;
+    private ExpenseService expenseService;
 
     @Operation(
         summary = "Import expenses from CSV file",
