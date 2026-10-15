@@ -1,66 +1,76 @@
 package com.spendy.auth.Data;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
+import jakarta.persistence.*;
+import java.util.UUID;
 
-@Document(collection = "users")
-@Schema(description = "User account entity representing a registered user in MongoDB")
-public class User
-{
+@Entity
+@Table(name = "users", indexes = {
+    @Index(name = "idx_users_username", columnList = "username"),
+    @Index(name = "idx_users_email", columnList = "email"),
+    @Index(name = "idx_users_house_user", columnList = "house_user")
+})
+@Schema(description = "User account entity representing a registered user in SpendyApp")
+public class User {
+
     @Id
-    @Field("_id")
-    @Schema(description = "Unique user identifier (MongoDB ObjectId)", accessMode = Schema.AccessMode.READ_ONLY, example = "60c72b2f9b1d8b2bad8e4b80")
+    @Column(name = "id_user", length = 64, nullable = false, updatable = false)
+    @Schema(description = "Unique user identifier (UUID)", accessMode = Schema.AccessMode.READ_ONLY, example = "60c72b2f-9b1d-8b2b-ad8e-4b8012345678")
     private String id_user;
 
-    @Field("username")
+    @Column(name = "username", length = 50, nullable = false, unique = true)
     @Schema(description = "Unique account username", requiredMode = Schema.RequiredMode.REQUIRED, example = "mario_rossi")
     private String username;
 
-    @Field("name")
+    @Column(name = "name", length = 100)
     @Schema(description = "User first name", example = "Mario")
     private String name;
 
-    @Field("password")
+    @Column(name = "password", length = 255, nullable = false)
     @Schema(description = "User password (hashed in storage; write-only)", accessMode = Schema.AccessMode.WRITE_ONLY, example = "Password123!")
     private String password;
 
-    @Field("surname")
+    @Column(name = "surname", length = 100)
     @Schema(description = "User last name", example = "Rossi")
     private String surname;
 
-    @Field("email")
+    @Column(name = "email", length = 150, nullable = false, unique = true)
     @Schema(description = "User email address", requiredMode = Schema.RequiredMode.REQUIRED, example = "mario.rossi@example.com")
     private String email;
 
-    @Field("language")
+    @Column(name = "language", length = 10)
     @Schema(description = "User preferred UI language", example = "it")
     private String language;
 
-    @Field("profile_image")
+    @Lob
+    @Column(name = "profile_image", columnDefinition = "LONGBLOB")
     @Schema(description = "User profile picture bytes", accessMode = Schema.AccessMode.WRITE_ONLY)
     private byte[] profileImage;
 
-    @Field("house_user")
+    @Column(name = "house_user", length = 50)
     @Schema(description = "Household identifier associated with this user", example = "house_123")
     private String houseUser;
 
+    @PrePersist
+    public void prePersist() {
+        if (this.id_user == null || this.id_user.isBlank()) {
+            this.id_user = UUID.randomUUID().toString();
+        }
+    }
+
     public User() { }
 
-    public User(String username, String name, String password, String surname, String email)
-    {
+    public User(String username, String name, String password, String surname, String email) {
         this.username = username;
         this.name = name;
         this.password = password;
         this.surname = surname;
         this.email = email;
         this.profileImage = null;
-        this.houseUser=null;
+        this.houseUser = null;
     }
 
-    public User(String username, String pass)
-    {
+    public User(String username, String pass) {
         this.username = username;
         this.password = pass;
     }
@@ -137,8 +147,3 @@ public class User
         this.houseUser = houseUser;
     }
 }
-
-
-
-
-

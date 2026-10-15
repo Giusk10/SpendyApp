@@ -14,14 +14,16 @@ app_port: 7860
 [![Java](https://img.shields.io/badge/Java-21-ED8B00?style=flat&logo=openjdk&logoColor=white)](https://openjdk.org/)
 [![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5.0-6DB33F?style=flat&logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
 [![Spring Cloud](https://img.shields.io/badge/Spring_Cloud_Gateway-Reactive-6DB33F?style=flat&logo=spring&logoColor=white)](https://spring.io/projects/spring-cloud-gateway)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas_%26_Local-47A248?style=flat&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.4-4479A1?style=flat&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Hibernate](https://img.shields.io/badge/Hibernate-JPA_6-59666C?style=flat&logo=hibernate&logoColor=white)](https://hibernate.org/)
+[![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=flat&logo=flyway&logoColor=white)](https://flywaydb.org/)
 [![Apache OpenNLP](https://img.shields.io/badge/Apache_OpenNLP-2.3.0-D22128?style=flat&logo=apache&logoColor=white)](https://opennlp.apache.org/)
 [![Docker](https://img.shields.io/badge/Docker-Multi--stage-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
 **Spendy** is a high-performance, microservices-based backend platform designed for **personal finance management** as well as shared households and roommates to track daily expenses, import bank statements, and analyze cash flows with automated debt settlement. 
 
-Engineered on **Java 21** and **Spring Boot 3.5**, Spendy utilizes a reactive **Spring Cloud Gateway**, **virtual threads**, independent **MongoDB** databases, and an integrated **Apache OpenNLP Machine Learning** engine for automated expense categorization.
+Engineered on **Java 21** and **Spring Boot 3.5**, Spendy utilizes a reactive **Spring Cloud Gateway**, **virtual threads**, **MySQL relational databases** with **Spring Data JPA** and **Hibernate**, automated **Flyway** schema migrations, and an integrated **Apache OpenNLP Machine Learning** engine for automated expense categorization.
 
 ---
 
@@ -64,9 +66,9 @@ flowchart TD
         ExpenseService["ExpenseMicroService<br/>(Port: 8084)<br/>- Jersey / Spring Boot<br/>- Smart CSV Parsing<br/>- OpenNLP ML Categorizer<br/>- Expense Analytics & CRUD"]
     end
 
-    subgraph DataStore ["Data Layer"]
-        AuthDB[("MongoDB<br/>(Users & Auth Credentials)")]
-        ExpenseDB[("MongoDB<br/>(Expenses & Categories)")]
+    subgraph DataStore ["Data Layer (MySQL 8.x)"]
+        AuthDB[("MySQL: spendy_auth<br/>(users, refresh_tokens)")]
+        ExpenseDB[("MySQL: spendy_expense<br/>(expenses)")]
     end
 
     Client -->|HTTP / HTTPS| Gateway
@@ -102,7 +104,7 @@ flowchart TD
   - Secure credential authentication utilizing **jBCrypt** with salted hashes.
   - JWT Access Token generation (15-minute validity) alongside Refresh Token rotation.
   - User profile retrieval and updating (`/profile`, `/updateProfile`).
-  - Persistence backed by MongoDB with standardized UUID representation.
+  - Persistence backed by MySQL with Spring Data JPA and automated Flyway migrations (`spendy_auth` schema).
 
 ### 3. Expense Microservice
 - **Directory**: `ExpenseMicroService/`
@@ -113,6 +115,7 @@ flowchart TD
   - **Expense Analytics**: Aggregate expense figures by exact dates, monthly windows, and yearly breakdowns.
   - **Full Transaction CRUD**: Create, read, update, single delete, and bulk wipe transactions linked to the authenticated user ID.
   - **Dual Categorization**: Real-time category classification on imported and manually added expenses.
+  - **Relational Persistence**: Spring Data JPA / Hibernate mapped to MySQL `expenses` table (`spendy_expense` schema) with Flyway migrations.
 
 ---
 
@@ -154,15 +157,17 @@ flowchart LR
 | **Framework** | Spring Boot 3.5.0 | Microservice runtime and dependency injection container |
 | **Gateway** | Spring Cloud Gateway | Reactive reverse proxy built on Spring WebFlux & Reactor Netty |
 | **REST APIs** | Jakarta RESTful Web Services / Jersey | JAX-RS implementation for service endpoint mapping |
-| **Database** | MongoDB | Document database running on MongoDB Atlas / local replica |
+| **Database** | MySQL 8.x | Relational database (`spendy_auth` and `spendy_expense` schemas) |
+| **ORM / Persistence** | Spring Data JPA & Hibernate 6 | Relational mapping, connection pooling (HikariCP), batch inserts |
+| **Schema Migrations** | Flyway | Automated versioned database migrations (`db/migration/V1__*.sql`) |
 | **Security** | Auth0 `java-jwt` & `jjwt` | HMAC SHA token creation, parsing, and claims verification |
 | **Cryptography** | jBCrypt 0.4 | Salted one-way password hashing |
 | **Machine Learning**| Apache OpenNLP 2.3.0 | Maximum Entropy natural language document categorization |
 | **CSV Parsing** | OpenCSV 5.9 | Robust delimited file parser for financial statement imports |
 | **Build System** | Maven 3.9+ | Multi-module build management with `license-maven-plugin` |
-| **Testing** | JUnit 5, Mockito, JaCoCo | Comprehensive unit testing and test coverage analysis |
+| **Testing** | JUnit 5, Mockito, JaCoCo, H2 | Unit tests, mock slices, and JPA integration tests |
 | **Load Testing** | k6 | Asynchronous stress and load benchmark suites |
-| **Deployment** | Docker & Alpine Linux | Multi-stage lightweight OCI container image |
+| **Deployment** | Docker & Docker Compose | Multi-stage lightweight OCI container image and compose orchestration |
 
 ---
 
@@ -173,11 +178,16 @@ Spendy utilizes a root `.env` file (loaded via `dotenv-java` across all modules)
 Create a `.env` file in the root directory:
 
 ```env
-# Database Connection String
-MONGODB_URI=mongodb+srv://<user>:<password>@cluster.mongodb.net/Spendy?retryWrites=true&w=majority
+# MySQL Database Connection Settings
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=spendy
+MYSQL_PASSWORD=spendypassword
+MYSQL_DATABASE_AUTH=spendy_auth
+MYSQL_DATABASE_EXPENSE=spendy_expense
 
 # JWT Authentication Config
-JWT_SECRET=your_super_secret_base64_encoded_key_minimum_256_bits
+JWT_SECRET=CW0I5xfJssGcKmieE4zy+KUP2nRjkRFm4piCXYTMRy8=
 JWT_EXPIRATION=900000
 
 # Microservice Network Routing
@@ -185,16 +195,22 @@ AUTH_SERVICE_URI=http://localhost:8081
 EXPENSE_SERVICE_URI=http://localhost:8084
 
 # JVM Options (Optional)
-JAVA_TOOL_OPTIONS=-Xms256m -Xmx1024m
+JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
 ```
 
 | Variable | Description | Example |
 | :--- | :--- | :--- |
-| `MONGODB_URI` | MongoDB Atlas or local connection string | `mongodb://localhost:27017/Spendy` |
+| `MYSQL_HOST` | MySQL hostname or Docker service name | `localhost` or `mysql` |
+| `MYSQL_PORT` | MySQL server port | `3306` |
+| `MYSQL_USER` | MySQL database user | `spendy` (or `root`) |
+| `MYSQL_PASSWORD` | MySQL user password | `spendypassword` |
+| `MYSQL_DATABASE_AUTH` | Database name for Auth Microservice | `spendy_auth` |
+| `MYSQL_DATABASE_EXPENSE` | Database name for Expense Microservice | `spendy_expense` |
 | `JWT_SECRET` | Secret key used to sign and verify HMAC tokens | `CW0I5xfJss...` |
 | `JWT_EXPIRATION` | Access token lifespan in milliseconds | `900000` (15 minutes) |
 | `AUTH_SERVICE_URI` | Destination URL for Auth Microservice | `http://localhost:8081` |
 | `EXPENSE_SERVICE_URI`| Destination URL for Expense Microservice | `http://localhost:8084` |
+| `GATEWAY_URI` | Destination URL for Gateway (used by microservices) | `http://localhost:7860` |
 
 ---
 
@@ -380,26 +396,36 @@ Base path via Gateway: `/Expense/rest/expense`
 ### Prerequisites
 - **JDK 21** installed and configured (`java -version`).
 - **Maven 3.9+** installed (`mvn -version`).
-- A running **MongoDB** instance or connection string to MongoDB Atlas.
+- **MySQL 8.x** running locally or via Docker (`mysql -u root`).
 
-### 1. Clone the Repository
+### 1. Database Initialization
+Before running locally, initialize the two relational schemas (`spendy_auth` and `spendy_expense`) and user permissions:
+```bash
+mysql -u root -p < init-db.sql
+```
+*Note: Flyway automatically applies versioned DDL migrations (`V1__create_auth_schema.sql` and `V1__create_expense_schema.sql`) when the microservices start up.*
+
+### 2. Migrating Data from MongoDB (Optional)
+If migrating an existing MongoDB database to MySQL, execute the idempotent data migration tool:
+```bash
+# Dry run check (no database changes)
+python3 scripts/migrate_mongo_to_mysql.py --dry-run
+
+# Run migration
+python3 scripts/migrate_mongo_to_mysql.py \
+  --mongo-uri "mongodb://localhost:27017" \
+  --mysql-host "localhost" \
+  --mysql-port 3306 \
+  --mysql-user "root" \
+  --mysql-password ""
+```
+
+### 3. Clone and Build
 ```bash
 git clone https://github.com/Giusk10/SpendyApp.git
 cd SpendyApp
-```
-
-### 2. Configure Environment
-Copy or create `.env` in the project root:
-```bash
-cp .env.example .env # or edit .env directly
-```
-
-### 3. Build Entire Multi-Module Reactor
-Run Maven from the root project folder:
-```bash
 mvn clean install -DskipTests
 ```
-This builds `spendy` (parent POM), `AuthMicroService`, `Gateway`, and `ExpenseMicroService`, and aggregates third-party licenses into `THIRD-PARTY-ALL.txt`.
 
 ### 4. Running the Services Locally
 
@@ -433,15 +459,20 @@ curl http://localhost:7860/
 
 ## 🐳 Docker & Containerized Deployment
 
-Spendy includes a multi-stage `Dockerfile` and an orchestration `entrypoint.sh` designed for deployment on container runtimes (such as **Hugging Face Spaces** or **Docker Compose**).
-
-### Build Docker Image
+### 1. Multi-Container Orchestration (Docker Compose)
+Run the entire platform including MySQL 8.4, AuthMicroService, ExpenseMicroService, and Gateway with automated health checks:
 ```bash
-docker build -t spendy-backend:latest .
+docker compose up --build -d
+```
+Check service logs and health status:
+```bash
+docker compose ps
+docker compose logs -f gateway-service
 ```
 
-### Run Container
+### 2. Standalone All-in-One Container (Hugging Face Spaces)
 ```bash
+docker build -t spendy-backend:latest .
 docker run -d \
   --name spendy-app \
   -p 7860:7860 \
@@ -450,10 +481,9 @@ docker run -d \
 ```
 
 ### Container Architecture Highlights
-- **Multi-Stage Build**: Compiles all three services using `maven:3.9.6-eclipse-temurin-21-alpine` and exports lightweight runtime artifacts into an `eclipse-temurin:21-jdk-alpine` runner.
+- **Multi-Stage Build**: Compiles all three services using `maven:3.9.6-eclipse-temurin-21-alpine` with targetable stages (`auth-service`, `expense-service`, `gateway-service`, and `all-in-one`).
 - **Rootless Execution**: Enforces non-root security (`UID 1000: user`) compliant with strict container sandbox environments.
-- **JVM Optimization**: Uses `-XX:+AlwaysPreTouch` and `-XX:+UseG1GC` to prevent memory thrashing under bursty load.
-- **Startup Orchestration**: `entrypoint.sh` starts `auth-service` and `expense-service` in the background, waits for backend port readiness, and then launches `gateway-service` in the foreground with HTTP access logging enabled.
+- **Readiness Polling**: `entrypoint.sh` starts `auth-service` and `expense-service` and actively polls their `/actuator/health` endpoints before launching `gateway-service`.
 
 ---
 

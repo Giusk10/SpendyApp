@@ -1,31 +1,30 @@
 package com.spendy.auth.Repository;
 
 import com.spendy.auth.Data.User;
-import org.springframework.data.mongodb.repository.MongoRepository;
-import org.springframework.data.mongodb.repository.Query;
-import org.springframework.data.mongodb.repository.Update;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-public interface IUserRepository extends MongoRepository<User, String>
-{
+public interface IUserRepository extends JpaRepository<User, String> {
 
-    @Query(value = "{ 'email' : ?0 }")
     User findByEmail(String email);
 
-    @Query(value = "{ 'username' : ?0 }")
     User findByUsername(String username);
 
-    @Query(value = "{ 'id_user' : ?0 }")
-    User findByIdUser(String id_user);
+    @Query("SELECT u FROM User u WHERE u.id_user = :id_user")
+    User findByIdUser(@Param("id_user") String id_user);
 
-    @Query(value = "{ 'house_user' : ?0 }")
     User findByHouseUser(String house_user);
 
-    @Update("{ '$set' : { 'house_user' : ?1 } }")
-    @Query("{ 'username' : ?0 }")
-    void setHouseUser(String username, String houseCode);
+    @Modifying(clearAutomatically = true)
+    @Transactional
+    @Query("UPDATE User u SET u.houseUser = :houseCode WHERE u.username = :username")
+    void setHouseUser(@Param("username") String username, @Param("houseCode") String houseCode);
 
-    @Query(value = "{ 'house_id' : ?0 }")
-    List<User> findByHouseId(String houseId);
+    @Query("SELECT u FROM User u WHERE u.houseUser = :houseId")
+    List<User> findByHouseId(@Param("houseId") String houseId);
 }

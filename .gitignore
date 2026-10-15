@@ -11,5 +11,6 @@
 /dataSources/
 /dataSources.local.xml
 .env
-/target/
+target/
+**/target/
 /ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/dataset.txt

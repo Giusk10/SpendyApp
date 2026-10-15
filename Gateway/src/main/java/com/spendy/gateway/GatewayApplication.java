@@ -25,11 +25,11 @@ public class GatewayApplication {
                 .ignoreIfMissing()
                 .load();
 
-        // Stampa di debug per essere sicuri che lo trovi
-        if (dotenv.get("MONGODB_URI") == null) {
-            System.out.println("⚠️ ATTENZIONE: Variabile MONGODB_URI non trovata nel .env o file non letto!");
+        // Stampa di debug per verificare configurazione
+        if (dotenv.get("JWT_SECRET") == null) {
+            System.out.println("⚠️ ATTENZIONE: Variabile JWT_SECRET non trovata nel .env o file non letto!");
         } else {
-            System.out.println("✅ .env caricato correttamente. URI trovato.");
+            System.out.println("✅ .env caricato correttamente. JWT_SECRET trovato.");
         }
 
         dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));

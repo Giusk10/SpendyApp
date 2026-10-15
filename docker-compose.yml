@@ -1,0 +1,102 @@
+services:
+  # --- MYSQL DATABASE SERVICE ---
+  mysql:
+    image: mysql:8.4
+    container_name: spendy-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_USER: ${MYSQL_USER:-spendy}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-spendypassword}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      - spendy-network
+
+  # --- AUTH SERVICE ---
+  auth-service:
+    build:
+      context: .
+      target: auth-service
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=${MYSQL_USER:-spendy}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-spendypassword}
+      - MYSQL_DATABASE_AUTH=${MYSQL_DATABASE_AUTH:-spendy_auth}
+      - GATEWAY_URI=http://gateway-service:7860
+      - SERVER_PORT=8081
+      - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms128m -Xmx256m}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - spendy-network
+
+  # --- EXPENSE SERVICE ---
+  expense-service:
+    build:
+      context: .
+      target: expense-service
+    container_name: expense-service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_PORT=3306
+      - MYSQL_USER=${MYSQL_USER:-spendy}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-spendypassword}
+      - MYSQL_DATABASE_EXPENSE=${MYSQL_DATABASE_EXPENSE:-spendy_expense}
+      - GATEWAY_URI=http://gateway-service:7860
+      - SERVER_PORT=8084
+      - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms256m -Xmx512m}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - spendy-network
+
+  # --- GATEWAY SERVICE ---
+  gateway-service:
+    build:
+      context: .
+      target: gateway-service
+    container_name: gateway-service
+    restart: unless-stopped
+    ports:
+      - "7860:7860"
+      - "8080:8080"
+    environment:
+      - JWT_SECRET=${JWT_SECRET:-CW0I5xfJssGcKmieE4zy+KUP2nRjkRFm4piCXYTMRy8=}
+      - JWT_EXPIRATION=${JWT_EXPIRATION:-900000}
+      - AUTH_SERVICE_URI=http://auth-service:8081
+      - EXPENSE_SERVICE_URI=http://expense-service:8084
+      - SERVER_PORT=7860
+      - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms128m -Xmx256m}
+    depends_on:
+      - auth-service
+      - expense-service
+    networks:
+      - spendy-network
+
+volumes:
+  mysql-data:
+    driver: local
+
+networks:
+  spendy-network:
+    driver: bridge

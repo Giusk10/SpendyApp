@@ -14,11 +14,11 @@ public class ExpenseMicroServiceApplication {
 				.ignoreIfMissing()
 				.load();
 
-		// Stampa di debug per essere sicuri che lo trovi
-		if (dotenv.get("MONGODB_URI") == null) {
-			System.out.println("⚠️ ATTENZIONE: Variabile MONGODB_URI non trovata nel .env o file non letto!");
+		// Stampa di debug per verificare configurazione database
+		if (dotenv.get("SPRING_DATASOURCE_URL") == null && dotenv.get("MYSQL_HOST") == null && dotenv.get("MYSQL_USER") == null) {
+			System.out.println("ℹ️ Configurazione MySQL da variabili di default/application.properties");
 		} else {
-			System.out.println("✅ .env caricato correttamente. URI trovato.");
+			System.out.println("✅ .env caricato correttamente. Configurazione database trovata.");
 		}
 
 		dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));

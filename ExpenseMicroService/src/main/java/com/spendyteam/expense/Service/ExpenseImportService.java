@@ -10,6 +10,7 @@ import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -39,12 +40,15 @@ public class ExpenseImportService {
 
     private final WebClient webClient;
 
+    @org.springframework.beans.factory.annotation.Value("${gateway.uri:http://localhost:7860}")
+    private String gatewayUri = "http://localhost:7860";
+
     // --- OTTIMIZZAZIONE GLOBALE ---
     // Questo semaforo è STATIC: condiviso tra TUTTE le istanze del service e TUTTI gli utenti.
-    // Impedisce a MongoDB Atlas di esplodere limitando le scritture simultanee a 10 batch.
+    // Limita le scritture simultanee a 10 batch concorrenti per salvaguardare il connection pool MySQL.
     private static final Semaphore DB_WRITE_SEMAPHORE = new Semaphore(10);
 
-    // Dimensione del blocco per il salvataggio su Mongo
+    // Dimensione del blocco per il salvataggio batch su MySQL
     private static final int BATCH_SIZE = 500;
 
     public ExpenseImportService() {
@@ -114,7 +118,7 @@ public class ExpenseImportService {
                 LongAdder dbErrors = new LongAdder();
 
                 // --- FASE 2: SALVATAGGIO BATCH (I/O BOUND CONTROLLATO) ---
-                // Scrive su Mongo a blocchi, protetto dal Semaforo Globale
+                // Scrive su MySQL tramite JPA a blocchi, protetto dal Semaforo Globale
                 try (var dbExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
                     for (List<Expense> batch : batches) {
                         dbExecutor.submit(() -> {
@@ -303,6 +307,7 @@ public class ExpenseImportService {
         return new BigDecimal(v);
     }
 
+    @Transactional(readOnly = true)
     public Response getExpenses(String token) {
         try {
             String username = getUsernameFromTokenViaRest(token);
@@ -325,6 +330,7 @@ public class ExpenseImportService {
     }
 
 
+    @Transactional(readOnly = true)
     public Response getExpenseByDate(String startedDate, String endDate, String token) {
 
         String username = getUsernameFromTokenViaRest(token);
@@ -361,6 +367,7 @@ public class ExpenseImportService {
 
 
 
+    @Transactional(readOnly = true)
     public Response getExpenseByMonth_Year(String month, String year, String token) {
 
         String startDate = year + "-" + month + "-01 00:00:00";
@@ -377,6 +384,7 @@ public class ExpenseImportService {
 
 
 
+    @Transactional(readOnly = true)
     public Response getMonthly_Amount_of_Year(String year , String token) {
         String startDate = year + "-01-01 00:00:00";
         String endDate = year + "-12-31 23:59:59";
@@ -412,7 +420,7 @@ public class ExpenseImportService {
     private String getUsernameFromTokenViaRest(String token) {
         try {
             Map<String, String> response = webClient.post()
-                    .uri("http://localhost:7860/gateway/verify-token")
+                    .uri(gatewayUri + "/gateway/verify-token")
                     .bodyValue(Map.of("token", token))
                     .retrieve()
                     .bodyToMono(Map.class)
@@ -425,6 +433,7 @@ public class ExpenseImportService {
         }
     }
 
+    @Transactional
     public Response deleteExpense(String expenseId, String token) {
         try {
             String username = getUsernameFromTokenViaRest(token);
@@ -450,6 +459,7 @@ public class ExpenseImportService {
         }
     }
 
+    @Transactional
     public Response addExpense(Map<String, String> body, String token) {
         try {
             Expense expense = new Expense();
@@ -478,6 +488,7 @@ public class ExpenseImportService {
         }
     }
 
+    @Transactional
     public Response updateExpense(Map<String, String> body, String token) {
         try {
             String expenseId = body.get("id");
@@ -529,6 +540,7 @@ public class ExpenseImportService {
         }
     }
 
+    @Transactional
     public Response deleteAllExpenses(String token) {
         try {
             String username = getUsernameFromTokenViaRest(token);
@@ -538,7 +550,7 @@ public class ExpenseImportService {
 
             // 🚀 METODO SICURO: Cancellazione lato DB
             // Nessun dato viene caricato in RAM. Nessun ciclo. Nessun thread.
-            // MongoDB cerca tutti i documenti con quel username e li cancella in un colpo solo.
+            // MySQL cerca tutti i record con quel username e li cancella in un colpo solo.
             long deletedCount = expenseRepository.deleteByUsername(username);
 
             if (deletedCount > 0) {

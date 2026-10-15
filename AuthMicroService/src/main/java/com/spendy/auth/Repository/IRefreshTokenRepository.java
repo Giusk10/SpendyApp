@@ -1,12 +1,17 @@
 package com.spendy.auth.Repository;
 
 import com.spendy.auth.Data.RefreshToken;
-import org.springframework.data.mongodb.repository.MongoRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
+
 import java.util.Optional;
 
-public interface IRefreshTokenRepository extends MongoRepository<RefreshToken, String> {
+public interface IRefreshTokenRepository extends JpaRepository<RefreshToken, String> {
 
     Optional<RefreshToken> findByToken(String token);
-    void deleteByUsername(String username);
 
+    @Modifying
+    @Transactional
+    void deleteByUsername(String username);
 }

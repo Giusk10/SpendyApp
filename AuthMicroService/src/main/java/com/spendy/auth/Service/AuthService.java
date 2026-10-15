@@ -7,7 +7,9 @@ import com.spendy.auth.Repository.IUserRepository;
 import com.spendy.auth.Utility.AuthResult;
 import com.spendy.auth.Utility.StatusAuth;
 import org.mindrot.jbcrypt.BCrypt;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
@@ -21,12 +23,16 @@ public class AuthService {
     private final IRefreshTokenRepository refreshTokenRepository;
     private final WebClient webClient;
 
+    @Value("${gateway.uri:http://localhost:7860}")
+    private String gatewayUri = "http://localhost:7860";
+
     public AuthService(IUserRepository userRepository, WebClient webClient, IRefreshTokenRepository refreshTokenRepository) {
         this.userRepository = userRepository;
         this.webClient = webClient;
         this.refreshTokenRepository = refreshTokenRepository;
     }
 
+    @Transactional
     public AuthResult register(String username, String name, String password, String surname, String email) {
         if (userRepository.findByUsername(username) != null || userRepository.findByEmail(email) != null) {
             return new AuthResult(StatusAuth.USER_ALREADY_EXISTS, null);
@@ -40,6 +46,7 @@ public class AuthService {
         return new AuthResult(StatusAuth.SUCCESS, token);
     }
 
+    @Transactional
     public AuthResult login(String identifier, String password) {
         User user = userRepository.findByUsername(identifier);
         if (user == null) {
@@ -58,7 +65,7 @@ public class AuthService {
 
     private String generateTokenViaRest(String username) {
         Map responseMap = webClient.post()
-                .uri("http://localhost:7860/gateway/generate-token")
+                .uri(gatewayUri + "/gateway/generate-token")
                 .bodyValue(Map.of("username", username))
                 .retrieve()
                 .bodyToMono(Map.class)
@@ -67,6 +74,7 @@ public class AuthService {
         return (String) responseMap.get("token");
     }
 
+    @Transactional
     public AuthResult refreshAccessToken(String requestRefreshToken) {
         Optional<RefreshToken> rtOpt = refreshTokenRepository.findByToken(requestRefreshToken);
 
@@ -95,7 +103,8 @@ public class AuthService {
     }
 
     // --- HELPER PRIVATO ---
-    private String createAndSaveRefreshToken(String username) {
+    @Transactional
+    public String createAndSaveRefreshToken(String username) {
         String token = UUID.randomUUID().toString();
         // Scadenza 30 giorni
         RefreshToken rt = new RefreshToken(token, username, LocalDateTime.now().plusDays(30));
@@ -105,7 +114,7 @@ public class AuthService {
 
     private String verifyTokenViaRest(String token) {
         Map responseMap = webClient.post()
-                .uri("http://localhost:7860/gateway/verify-token")
+                .uri(gatewayUri + "/gateway/verify-token")
                 .bodyValue(Map.of("token", token))
                 .retrieve()
                 .bodyToMono(Map.class)
@@ -114,8 +123,8 @@ public class AuthService {
         return (String) responseMap.get("username");
     }
 
+    @Transactional(readOnly = true)
     public User getUserFromToken(String accessToken) {
-
         String username = verifyTokenViaRest(accessToken);
         if (username != null) {
             return userRepository.findByUsername(username);
@@ -123,6 +132,7 @@ public class AuthService {
         return null;
     }
 
+    @Transactional
     public AuthResult updateUserProfile(String accessToken, User updatedUser) {
         String username = verifyTokenViaRest(accessToken);
         if (username == null) {

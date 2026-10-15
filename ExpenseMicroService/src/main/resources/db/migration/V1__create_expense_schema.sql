@@ -1,0 +1,20 @@
+CREATE TABLE IF NOT EXISTS expenses (
+    id VARCHAR(64) NOT NULL PRIMARY KEY,
+    type VARCHAR(50),
+    product VARCHAR(255),
+    started_date DATETIME(6),
+    completed_date DATETIME(6),
+    description VARCHAR(500),
+    amount DECIMAL(15, 2) NOT NULL,
+    fee DECIMAL(15, 2) DEFAULT 0.00,
+    currency VARCHAR(10),
+    state VARCHAR(50),
+    category VARCHAR(100),
+    username VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_expenses_username (username),
+    INDEX idx_expenses_user_started (username, started_date),
+    INDEX idx_expenses_user_completed (username, completed_date),
+    INDEX idx_expenses_user_category (username, category)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
