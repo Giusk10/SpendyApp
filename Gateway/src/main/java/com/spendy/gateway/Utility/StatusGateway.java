@@ -1,5 +1,8 @@
 package com.spendy.gateway.Utility;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Gateway operation result status enumeration", enumAsRef = true)
 public enum StatusGateway {
     TOKEN_GENERATION_SUCCESS,
     TOKEN_GENERATION_FAILED,

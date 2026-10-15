@@ -140,7 +140,8 @@ class TokenManagerTest {
         String token = tokenManager.generateToken(username);
 
         // Modifica l'ultimo carattere del token per invalidare la firma
-        String tamperedToken = token.substring(0, token.length() - 1) + "X";
+        String replacement = token.endsWith("X") ? "Y" : "X";
+        String tamperedToken = token.substring(0, token.length() - 1) + replacement;
         String result = tokenManager.verifyToken(tamperedToken);
 
         assertNull(result);

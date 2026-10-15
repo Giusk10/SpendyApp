@@ -1,5 +1,8 @@
 package com.spendyteam.expense.Utility;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Outcome status for expense operations", enumAsRef = true)
 public enum ExpenseStatus
 {
     SUCCESS("Success"),

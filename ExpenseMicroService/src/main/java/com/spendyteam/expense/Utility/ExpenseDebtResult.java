@@ -1,9 +1,17 @@
 package com.spendyteam.expense.Utility;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Response wrapper for expense debt operations")
 public class ExpenseDebtResult {
 
+    @Schema(description = "Status of the debt operation", example = "SUCCESS")
     private ExpenseStatus status;
+
+    @Schema(description = "Result explanation or status message", example = "Debts retrieved successfully")
     private String message;
+
+    @Schema(description = "Payload containing debt details")
     private Object debts;
 
     public ExpenseDebtResult(ExpenseStatus status, String message, Object debts) {

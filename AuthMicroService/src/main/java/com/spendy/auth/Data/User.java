@@ -1,38 +1,49 @@
 package com.spendy.auth.Data;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 
 @Document(collection = "users")
+@Schema(description = "User account entity representing a registered user in MongoDB")
 public class User
 {
     @Id
     @Field("_id")
+    @Schema(description = "Unique user identifier (MongoDB ObjectId)", accessMode = Schema.AccessMode.READ_ONLY, example = "60c72b2f9b1d8b2bad8e4b80")
     private String id_user;
 
     @Field("username")
+    @Schema(description = "Unique account username", requiredMode = Schema.RequiredMode.REQUIRED, example = "mario_rossi")
     private String username;
 
     @Field("name")
+    @Schema(description = "User first name", example = "Mario")
     private String name;
 
     @Field("password")
+    @Schema(description = "User password (hashed in storage; write-only)", accessMode = Schema.AccessMode.WRITE_ONLY, example = "Password123!")
     private String password;
 
     @Field("surname")
+    @Schema(description = "User last name", example = "Rossi")
     private String surname;
 
     @Field("email")
+    @Schema(description = "User email address", requiredMode = Schema.RequiredMode.REQUIRED, example = "mario.rossi@example.com")
     private String email;
 
     @Field("language")
+    @Schema(description = "User preferred UI language", example = "it")
     private String language;
 
     @Field("profile_image")
+    @Schema(description = "User profile picture bytes", accessMode = Schema.AccessMode.WRITE_ONLY)
     private byte[] profileImage;
 
     @Field("house_user")
+    @Schema(description = "Household identifier associated with this user", example = "house_123")
     private String houseUser;
 
     public User() { }

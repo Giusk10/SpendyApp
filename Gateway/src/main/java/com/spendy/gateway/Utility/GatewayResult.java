@@ -1,8 +1,14 @@
 package com.spendy.gateway.Utility;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
+@Schema(description = "Gateway token operation outcome")
 public class GatewayResult {
 
+    @Schema(description = "Gateway operation status", example = "TOKEN_GENERATION_SUCCESS")
     private StatusGateway statusGateway;
+
+    @Schema(description = "Token or username payload depending on operation", example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
     private String token;
 
     public GatewayResult(StatusGateway statusGateway, String token) {
