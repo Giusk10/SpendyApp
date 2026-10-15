@@ -17,8 +17,8 @@ import org.springframework.context.annotation.Configuration;
         contact = @Contact(name = "Spendy Team", url = "https://github.com/Giusk10/SpendyApp")
     ),
     servers = {
-        @Server(url = "http://localhost:8084", description = "Direct Expense Microservice"),
-        @Server(url = "http://localhost:7860/Expense", description = "Via API Gateway")
+        @Server(url = "http://localhost:7860/Expense", description = "Via API Gateway (Default)"),
+        @Server(url = "http://localhost:8084", description = "Direct Expense Microservice")
     }
 )
 @SecurityScheme(

@@ -11,12 +11,12 @@ public class CorsGlobalConfiguration {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.addAllowedOrigin("http://localhost:5173");
-        corsConfig.addAllowedOrigin("http://100.117.226.152:5173");
-        corsConfig.addAllowedOrigin("http://100.115.146.177:5173");
+        corsConfig.addAllowedOriginPattern("*");
         corsConfig.addAllowedMethod("*");
         corsConfig.addAllowedHeader("*");
+        corsConfig.addExposedHeader("*");
         corsConfig.setAllowCredentials(true);
+        corsConfig.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfig);

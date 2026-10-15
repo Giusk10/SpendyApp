@@ -45,4 +45,22 @@ class SecurityConfigTest {
     void testSecurityConfig_NotNull() {
         assertNotNull(securityConfig);
     }
+
+    @Test
+    void testCorsConfigurationSource() {
+        org.springframework.web.cors.reactive.CorsConfigurationSource source = securityConfig.corsConfigurationSource();
+        assertNotNull(source);
+
+        org.springframework.mock.http.server.reactive.MockServerHttpRequest request =
+            org.springframework.mock.http.server.reactive.MockServerHttpRequest.get("/Expense/rest/expense/getAll")
+                .header("Origin", "http://localhost:5173")
+                .build();
+        org.springframework.mock.web.server.MockServerWebExchange exchange =
+            org.springframework.mock.web.server.MockServerWebExchange.from(request);
+
+        org.springframework.web.cors.CorsConfiguration config = source.getCorsConfiguration(exchange);
+        assertNotNull(config);
+        org.junit.jupiter.api.Assertions.assertTrue(Boolean.TRUE.equals(config.getAllowCredentials()));
+        org.junit.jupiter.api.Assertions.assertTrue(config.getAllowedOriginPatterns().contains("*"));
+    }
 }
