@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.ws.rs.core.Response;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +30,14 @@ public class ExpenseController {
 
     @Autowired
     private ExpenseService expenseService;
+
+    private String extractBearerToken(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ") || authHeader.length() <= 7) {
+            return null;
+        }
+        String token = authHeader.substring(7).trim();
+        return token.isEmpty() ? null : token;
+    }
 
     @Operation(
         summary = "Import expenses from CSV file",
@@ -65,8 +74,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
         try {
-            String token = authHeader.substring(7);
             Response res = expenseService.importExpensesFromCsv(file, token);
             if (res.getStatus() == 200) {
                 return ResponseEntity.ok(res.getEntity().toString());
@@ -74,7 +86,6 @@ public class ExpenseController {
                 return ResponseEntity.status(res.getStatus()).body(res.getEntity().toString());
             }
         } catch (Exception e) {
-            e.printStackTrace();
             return ResponseEntity.badRequest().body("Failed to import CSV: " + e.getMessage());
         }
     }
@@ -112,8 +123,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
         try {
-            String token = authHeader.substring(7);
             Response res = expenseService.getExpenses(token);
             if (res.getStatus() == 200) {
                 return ResponseEntity.ok().body(res.getEntity());
@@ -166,8 +180,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
         try {
-            String token = authHeader.substring(7);
             String startedDate = body.get("startedDate");
             String completedDate = body.get("completedDate");
 
@@ -223,8 +240,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
         try {
-            String token = authHeader.substring(7);
             String month = body.get("month");
             String year = body.get("year");
             Response res = expenseService.getExpenseByMonth_Year(month, year, token);
@@ -279,8 +299,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
         try {
-            String token = authHeader.substring(7);
             String year = body.get("year");
             Response res = expenseService.getMonthly_Amount_of_Year(year, token);
             if (res.getStatus() == 200) {
@@ -339,8 +362,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
         try {
-            String token = authHeader.substring(7);
             Response res = expenseService.deleteExpense(body.get("expenseId"), token);
             if (res.getStatus() == 200) {
                 return ResponseEntity.ok(res.getEntity());
@@ -385,8 +411,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
         try {
-            String token = authHeader.substring(7);
             Response res = expenseService.deleteAllExpenses(token);
             if (res.getStatus() == 200) {
                 return ResponseEntity.ok(res.getEntity());
@@ -437,8 +466,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
         try {
-            String token = authHeader.substring(7);
             Response res = expenseService.addExpense(body, token);
             if (res.getStatus() == 201) {
                 return ResponseEntity.created(null).body(res.getEntity());
@@ -494,8 +526,11 @@ public class ExpenseController {
         )
         @RequestHeader(value = "Authorization", required = false) String authHeader
     ) {
+        String token = extractBearerToken(authHeader);
+        if (token == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
         try {
-            String token = authHeader.substring(7);
             Response res = expenseService.updateExpense(body, token);
             if (res.getStatus() == 200) {
                 return ResponseEntity.ok().body(res.getEntity());

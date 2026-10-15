@@ -2,6 +2,7 @@ package com.spendyteam.expense.Service;
 
 import com.spendyteam.expense.Data.Expense;
 import com.spendyteam.expense.Repository.IExpenseRepository;
+import com.spendyteam.expense.Utility.ExpenseDataParser;
 import jakarta.ws.rs.core.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,8 +11,6 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 import org.springframework.mock.web.MockMultipartFile;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -20,7 +19,6 @@ import java.util.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class ExpenseServiceTest {
@@ -32,16 +30,7 @@ class ExpenseServiceTest {
     private SmartCategorizerService smartCategorizerService;
 
     @Mock
-    private WebClient webClient;
-
-    @Mock
-    private WebClient.RequestBodyUriSpec requestBodyUriSpec;
-
-    @Mock
-    private WebClient.RequestBodySpec requestBodySpec;
-
-    @Mock
-    private WebClient.ResponseSpec responseSpec;
+    private UserAuthService userAuthService;
 
     private ExpenseService expenseService;
 
@@ -49,19 +38,18 @@ class ExpenseServiceTest {
 
     @BeforeEach
     void setUp() {
-        expenseService = new ExpenseService(webClient);
+        ExpenseDataParser expenseDataParser = new ExpenseDataParser();
+        ExpenseCsvParser expenseCsvParser = new ExpenseCsvParser(expenseDataParser, smartCategorizerService);
+        ExpenseBatchWriter expenseBatchWriter = new ExpenseBatchWriter(expenseRepository);
 
-        try {
-            java.lang.reflect.Field repoField = ExpenseService.class.getDeclaredField("expenseRepository");
-            repoField.setAccessible(true);
-            repoField.set(expenseService, expenseRepository);
-
-            java.lang.reflect.Field smartField = ExpenseService.class.getDeclaredField("smartCategorizerService");
-            smartField.setAccessible(true);
-            smartField.set(expenseService, smartCategorizerService);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
+        expenseService = new ExpenseService(
+            expenseRepository,
+            smartCategorizerService,
+            userAuthService,
+            expenseDataParser,
+            expenseCsvParser,
+            expenseBatchWriter
+        );
 
         mockExpense = new Expense();
         mockExpense.setType("Payment");
@@ -75,12 +63,6 @@ class ExpenseServiceTest {
         mockExpense.setState("COMPLETED");
         mockExpense.setCategory("Abbonamenti e Servizi Digitali");
         mockExpense.setUsername("testuser");
-
-        // Setup WebClient mocks - lenient because not all tests use them
-        lenient().when(webClient.post()).thenReturn(requestBodyUriSpec);
-        lenient().when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
-        lenient().when(requestBodySpec.bodyValue(any())).thenAnswer(invocation -> requestBodySpec);
-        lenient().when(requestBodySpec.retrieve()).thenReturn(responseSpec);
     }
 
     @Test
@@ -109,7 +91,7 @@ class ExpenseServiceTest {
             csvContent.getBytes()
         );
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn(null);
 
         Response response = expenseService.importExpensesFromCsv(file, "invalid-token");
 
@@ -119,10 +101,8 @@ class ExpenseServiceTest {
     @Test
     void testGetExpensesSuccess() {
         String token = "valid-token";
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findByUsername(eq("testuser"), any(Sort.class)))
             .thenReturn(List.of(mockExpense));
 
@@ -136,7 +116,7 @@ class ExpenseServiceTest {
     void testGetExpensesUnauthorized() {
         String token = "invalid-token";
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn(null);
 
         Response response = expenseService.getExpenses(token);
 
@@ -146,10 +126,8 @@ class ExpenseServiceTest {
     @Test
     void testGetExpensesNoContent() {
         String token = "valid-token";
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findByUsername(eq("testuser"), any(Sort.class)))
             .thenReturn(Collections.emptyList());
 
@@ -164,10 +142,7 @@ class ExpenseServiceTest {
         String startDate = "2024-01-01";
         String endDate = "2024-01-31";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findExpensesByDateRange(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(List.of(mockExpense));
 
@@ -183,10 +158,7 @@ class ExpenseServiceTest {
         String startDate = "2024-01-01";
         String endDate = "2024-01-31";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findExpensesByDateRange(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(Collections.emptyList());
 
@@ -201,7 +173,7 @@ class ExpenseServiceTest {
         String startDate = "2024-01-01";
         String endDate = "2024-01-31";
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn(null);
 
         Response response = expenseService.getExpenseByDate(startDate, endDate, token);
 
@@ -214,10 +186,7 @@ class ExpenseServiceTest {
         String month = "01";
         String year = "2024";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findExpensesByDateRange(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(List.of(mockExpense));
 
@@ -233,10 +202,7 @@ class ExpenseServiceTest {
         String month = "01";
         String year = "2024";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findExpensesByDateRange(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(Collections.emptyList());
 
@@ -250,9 +216,6 @@ class ExpenseServiceTest {
         String token = "valid-token";
         String year = "2024";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
         com.spendyteam.expense.DTO.MonthlyExpenseTotal total1 = mock(com.spendyteam.expense.DTO.MonthlyExpenseTotal.class);
         when(total1.getMonthKey()).thenReturn("2024-01");
         when(total1.getTotalAmount()).thenReturn(new BigDecimal("-50.00"));
@@ -261,7 +224,7 @@ class ExpenseServiceTest {
         when(total2.getMonthKey()).thenReturn("2024-02");
         when(total2.getTotalAmount()).thenReturn(new BigDecimal("-75.00"));
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.aggregateMonthlyExpenses(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(Arrays.asList(total1, total2));
 
@@ -280,10 +243,7 @@ class ExpenseServiceTest {
         String token = "valid-token";
         String year = "2024";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.aggregateMonthlyExpenses(eq("testuser"), any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(Collections.emptyList());
 
@@ -297,10 +257,7 @@ class ExpenseServiceTest {
         String token = "valid-token";
         String expenseId = "expense123";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(mockExpense));
 
         Response response = expenseService.deleteExpense(expenseId, token);
@@ -314,10 +271,7 @@ class ExpenseServiceTest {
         String token = "valid-token";
         String expenseId = "nonexistent";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findById(expenseId)).thenReturn(Optional.empty());
 
         Response response = expenseService.deleteExpense(expenseId, token);
@@ -330,13 +284,10 @@ class ExpenseServiceTest {
         String token = "valid-token";
         String expenseId = "expense123";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "otheruser");
-
         Expense otherUserExpense = new Expense();
         otherUserExpense.setUsername("testuser");
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("otheruser");
         when(expenseRepository.findById(expenseId)).thenReturn(Optional.of(otherUserExpense));
 
         Response response = expenseService.deleteExpense(expenseId, token);
@@ -358,10 +309,7 @@ class ExpenseServiceTest {
         body.put("currency", "EUR");
         body.put("state", "COMPLETED");
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(smartCategorizerService.predictCategory(anyString()))
             .thenReturn("Abbonamenti e Servizi Digitali");
         when(expenseRepository.save(any(Expense.class))).thenReturn(mockExpense);
@@ -377,7 +325,7 @@ class ExpenseServiceTest {
         String token = "invalid-token";
         Map<String, String> body = new HashMap<>();
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn(null);
 
         Response response = expenseService.addExpense(body, token);
 
@@ -392,10 +340,7 @@ class ExpenseServiceTest {
         body.put("amount", "19.99");
         body.put("description", "Updated Netflix subscription");
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.findById("expense123")).thenReturn(Optional.of(mockExpense));
         when(smartCategorizerService.predictCategory(anyString()))
             .thenReturn("Abbonamenti e Servizi Digitali");
@@ -435,13 +380,10 @@ class ExpenseServiceTest {
         Map<String, String> body = new HashMap<>();
         body.put("id", "expense123");
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "otheruser");
-
         Expense otherUserExpense = new Expense();
         otherUserExpense.setUsername("testuser");
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("otheruser");
         when(expenseRepository.findById("expense123")).thenReturn(Optional.of(otherUserExpense));
 
         Response response = expenseService.updateExpense(body, token);
@@ -453,10 +395,7 @@ class ExpenseServiceTest {
     void testDeleteAllExpensesSuccess() {
         String token = "valid-token";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.deleteByUsername("testuser")).thenReturn(5L);
 
         Response response = expenseService.deleteAllExpenses(token);
@@ -469,10 +408,7 @@ class ExpenseServiceTest {
     void testDeleteAllExpensesNoExpenses() {
         String token = "valid-token";
 
-        Map<String, String> authResponse = new HashMap<>();
-        authResponse.put("username", "testuser");
-
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(authResponse));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn("testuser");
         when(expenseRepository.deleteByUsername("testuser")).thenReturn(0L);
 
         Response response = expenseService.deleteAllExpenses(token);
@@ -484,7 +420,7 @@ class ExpenseServiceTest {
     void testDeleteAllExpensesUnauthorized() {
         String token = "invalid-token";
 
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
+        when(userAuthService.getUsernameFromToken(anyString())).thenReturn(null);
 
         Response response = expenseService.deleteAllExpenses(token);
 

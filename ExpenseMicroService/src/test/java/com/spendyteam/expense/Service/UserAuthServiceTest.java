@@ -1,62 +1,121 @@
 package com.spendyteam.expense.Service;
 
+import com.nimbusds.jose.JWSAlgorithm;
+import com.nimbusds.jose.JWSHeader;
+import com.nimbusds.jose.JWSSigner;
+import com.nimbusds.jose.crypto.RSASSASigner;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
-import java.util.Collections;
-import java.util.Map;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.interfaces.RSAPrivateKey;
+import java.security.interfaces.RSAPublicKey;
+import java.util.Date;
+import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserAuthServiceTest {
 
-    @Mock
-    private WebClient webClient;
-
-    @Mock
-    private WebClient.RequestBodyUriSpec requestBodyUriSpec;
-
-    @Mock
-    private WebClient.RequestBodySpec requestBodySpec;
-
-    @Mock
-    private WebClient.ResponseSpec responseSpec;
-
+    private RSAPrivateKey privateKey;
+    private RSAPublicKey publicKey;
     private UserAuthService userAuthService;
 
     @BeforeEach
-    void setUp() {
-        userAuthService = new UserAuthService(webClient, "http://localhost:7860");
+    void setUp() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        KeyPair kp = kpg.generateKeyPair();
+        privateKey = (RSAPrivateKey) kp.getPrivate();
+        publicKey = (RSAPublicKey) kp.getPublic();
 
-        lenient().when(webClient.post()).thenReturn(requestBodyUriSpec);
-        lenient().when(requestBodyUriSpec.uri(anyString())).thenReturn(requestBodySpec);
-        lenient().when(requestBodySpec.bodyValue(any())).thenAnswer(invocation -> requestBodySpec);
-        lenient().when(requestBodySpec.retrieve()).thenReturn(responseSpec);
+        userAuthService = new UserAuthService(publicKey, "spendy-auth", "spendy-app");
+    }
+
+    private String createToken(RSAPrivateKey key, String issuer, String audience, long expiryOffsetMs) throws Exception {
+        Date now = new Date();
+        Date expiry = new Date(now.getTime() + expiryOffsetMs);
+
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .subject("john_doe")
+                .issuer(issuer)
+                .audience(audience)
+                .issueTime(now)
+                .expirationTime(expiry)
+                .jwtID(UUID.randomUUID().toString())
+                .claim("roles", List.of("ROLE_USER"))
+                .build();
+
+        SignedJWT signedJWT = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("spendy-auth-key-1").build(),
+                claimsSet
+        );
+
+        JWSSigner signer = new RSASSASigner(key);
+        signedJWT.sign(signer);
+
+        return signedJWT.serialize();
     }
 
     @Test
-    void testGetUsernameFromTokenValid() {
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Map.of("username", "john_doe")));
-
-        String username = userAuthService.getUsernameFromToken("valid-jwt-token");
+    void testGetUsernameFromTokenValid() throws Exception {
+        String token = createToken(privateKey, "spendy-auth", "spendy-app", 60000);
+        String username = userAuthService.getUsernameFromToken(token);
 
         assertEquals("john_doe", username);
     }
 
     @Test
-    void testGetUsernameFromTokenInvalidOrExpired() {
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Collections.emptyMap()));
+    void testGetUsernameFromTokenInvalidOrExpired() throws Exception {
+        String token = createToken(privateKey, "spendy-auth", "spendy-app", -5000);
+        String username = userAuthService.getUsernameFromToken(token);
 
-        String username = userAuthService.getUsernameFromToken("invalid-token");
+        assertNull(username);
+    }
+
+    @Test
+    void testGetUsernameFromTokenTamperedSignature() throws Exception {
+        String token = createToken(privateKey, "spendy-auth", "spendy-app", 60000);
+        int lastDot = token.lastIndexOf('.');
+        int targetPos = lastDot + 10;
+        char orig = token.charAt(targetPos);
+        char replaced = (orig == 'A') ? 'B' : 'A';
+        String tampered = token.substring(0, targetPos) + replaced + token.substring(targetPos + 1);
+
+        String username = userAuthService.getUsernameFromToken(tampered);
+        assertNull(username);
+    }
+
+    @Test
+    void testGetUsernameFromTokenWrongKey() throws Exception {
+        KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+        kpg.initialize(2048);
+        KeyPair kp2 = kpg.generateKeyPair();
+        String token = createToken((RSAPrivateKey) kp2.getPrivate(), "spendy-auth", "spendy-app", 60000);
+
+        String username = userAuthService.getUsernameFromToken(token);
+        assertNull(username);
+    }
+
+    @Test
+    void testGetUsernameFromTokenWrongIssuer() throws Exception {
+        String token = createToken(privateKey, "wrong-issuer", "spendy-app", 60000);
+        String username = userAuthService.getUsernameFromToken(token);
+
+        assertNull(username);
+    }
+
+    @Test
+    void testGetUsernameFromTokenWrongAudience() throws Exception {
+        String token = createToken(privateKey, "spendy-auth", "wrong-audience", 60000);
+        String username = userAuthService.getUsernameFromToken(token);
 
         assertNull(username);
     }
@@ -66,23 +125,21 @@ class UserAuthServiceTest {
         assertNull(userAuthService.getUsernameFromToken(null));
         assertNull(userAuthService.getUsernameFromToken(""));
         assertNull(userAuthService.getUsernameFromToken("   "));
+        assertNull(userAuthService.getUsernameFromToken("invalid.jwt.token"));
     }
 
     @Test
-    void testGetUsernameFromTokenNetworkFailure() {
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.error(new RuntimeException("Gateway unreachable")));
+    void testGetUsernameFromTokenViaRestAlias() throws Exception {
+        String token = createToken(privateKey, "spendy-auth", "spendy-app", 60000);
+        String username = userAuthService.getUsernameFromTokenViaRest(token);
 
-        String username = userAuthService.getUsernameFromToken("token-causes-error");
-
-        assertNull(username);
+        assertEquals("john_doe", username);
     }
 
     @Test
-    void testGetUsernameFromTokenViaRestAlias() {
-        when(responseSpec.bodyToMono(Map.class)).thenReturn(Mono.just(Map.of("username", "alice")));
-
-        String username = userAuthService.getUsernameFromTokenViaRest("alias-token");
-
-        assertEquals("alice", username);
+    void testInitAndLoadPublicKeyFromClasspath() {
+        UserAuthService service = new UserAuthService();
+        service.init();
+        assertNotNull(service);
     }
 }

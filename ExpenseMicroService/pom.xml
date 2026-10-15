@@ -63,14 +63,10 @@
             <artifactId>flyway-mysql</artifactId>
         </dependency>
 
-        <!-- Security & Auth -->
+        <!-- Security & JWT Validation -->
         <dependency>
-            <groupId>com.auth0</groupId>
-            <artifactId>java-jwt</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.mindrot</groupId>
-            <artifactId>jbcrypt</artifactId>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-oauth2-jose</artifactId>
         </dependency>
 
         <!-- CSV & NLP Processing -->

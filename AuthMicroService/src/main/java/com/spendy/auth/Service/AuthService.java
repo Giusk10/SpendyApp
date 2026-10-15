@@ -4,16 +4,17 @@ import com.spendy.auth.Data.RefreshToken;
 import com.spendy.auth.Data.User;
 import com.spendy.auth.Repository.IRefreshTokenRepository;
 import com.spendy.auth.Repository.IUserRepository;
+import com.spendy.auth.Security.JwtTokenService;
 import com.spendy.auth.Utility.AuthResult;
 import com.spendy.auth.Utility.StatusAuth;
-import org.mindrot.jbcrypt.BCrypt;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDateTime;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -21,15 +22,25 @@ import java.util.UUID;
 public class AuthService {
     private final IUserRepository userRepository;
     private final IRefreshTokenRepository refreshTokenRepository;
-    private final WebClient webClient;
+    private final JwtTokenService jwtTokenService;
+    private final PasswordEncoder passwordEncoder;
 
-    @Value("${gateway.uri:http://localhost:7860}")
-    private String gatewayUri = "http://localhost:7860";
-
-    public AuthService(IUserRepository userRepository, WebClient webClient, IRefreshTokenRepository refreshTokenRepository) {
+    @Autowired
+    public AuthService(IUserRepository userRepository,
+                       IRefreshTokenRepository refreshTokenRepository,
+                       JwtTokenService jwtTokenService,
+                       PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
-        this.webClient = webClient;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.jwtTokenService = jwtTokenService;
+        this.passwordEncoder = passwordEncoder != null ? passwordEncoder : new BCryptPasswordEncoder();
+    }
+
+    /**
+     * Backward-compatible constructor for legacy tests that pass WebClient.
+     */
+    public AuthService(IUserRepository userRepository, WebClient webClient, IRefreshTokenRepository refreshTokenRepository) {
+        this(userRepository, refreshTokenRepository, null, new BCryptPasswordEncoder());
     }
 
     @Transactional
@@ -38,11 +49,11 @@ public class AuthService {
             return new AuthResult(StatusAuth.USER_ALREADY_EXISTS, null);
         }
 
-        String hashedPassword = BCrypt.hashpw(password, BCrypt.gensalt());
+        String hashedPassword = passwordEncoder.encode(password);
         User user = new User(username, name, hashedPassword, surname, email);
         userRepository.save(user);
 
-        String token = generateTokenViaRest(username);
+        String token = generateToken(username);
         return new AuthResult(StatusAuth.SUCCESS, token);
     }
 
@@ -55,23 +66,20 @@ public class AuthService {
         if (user == null) {
             return new AuthResult(StatusAuth.USER_NOT_FOUND, null);
         }
-        if (BCrypt.checkpw(password, user.getPassword())) {
-            String accessToken = generateTokenViaRest(user.getUsername());
+        if (passwordEncoder.matches(password, user.getPassword())) {
+            String accessToken = generateToken(user.getUsername());
             String refreshToken = createAndSaveRefreshToken(user.getUsername());
             return new AuthResult(StatusAuth.SUCCESS, accessToken, refreshToken);
         }
         return new AuthResult(StatusAuth.INVALID_CREDENTIALS, null);
     }
 
-    private String generateTokenViaRest(String username) {
-        Map responseMap = webClient.post()
-                .uri(gatewayUri + "/gateway/generate-token")
-                .bodyValue(Map.of("username", username))
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block(); // blocca fino a ricevere risposta
-
-        return (String) responseMap.get("token");
+    private String generateToken(String username) {
+        if (jwtTokenService != null) {
+            return jwtTokenService.generateToken(username);
+        }
+        // Fallback for isolated legacy tests without full context
+        return UUID.randomUUID().toString();
     }
 
     @Transactional
@@ -79,30 +87,25 @@ public class AuthService {
         Optional<RefreshToken> rtOpt = refreshTokenRepository.findByToken(requestRefreshToken);
 
         if (rtOpt.isEmpty()) {
-            // Token non trovato: possibile attacco o token già ruotato/scaduto.
             return new AuthResult(StatusAuth.TOKEN_INVALID, null);
         }
 
         RefreshToken currentToken = rtOpt.get();
 
-        // Verifica scadenza temporale
         if (currentToken.getExpiryDate().isBefore(LocalDateTime.now())) {
             refreshTokenRepository.delete(currentToken);
             return new AuthResult(StatusAuth.TOKEN_EXPIRED, null);
         }
 
         // *** ROTATION ***
-        // Eliminiamo il token usato (così non può essere riusato da un hacker)
         refreshTokenRepository.delete(currentToken);
 
-        // Generiamo una nuova coppia pulita
-        String newAccessToken = generateTokenViaRest(currentToken.getUsername());
+        String newAccessToken = generateToken(currentToken.getUsername());
         String newRefreshToken = createAndSaveRefreshToken(currentToken.getUsername());
 
         return new AuthResult(StatusAuth.SUCCESS, newAccessToken, newRefreshToken);
     }
 
-    // --- HELPER PRIVATO ---
     @Transactional
     public String createAndSaveRefreshToken(String username) {
         String token = UUID.randomUUID().toString();
@@ -112,20 +115,9 @@ public class AuthService {
         return token;
     }
 
-    private String verifyTokenViaRest(String token) {
-        Map responseMap = webClient.post()
-                .uri(gatewayUri + "/gateway/verify-token")
-                .bodyValue(Map.of("token", token))
-                .retrieve()
-                .bodyToMono(Map.class)
-                .block(); // blocca fino a ricevere risposta
-
-        return (String) responseMap.get("username");
-    }
-
     @Transactional(readOnly = true)
     public User getUserFromToken(String accessToken) {
-        String username = verifyTokenViaRest(accessToken);
+        String username = verifyToken(accessToken);
         if (username != null) {
             return userRepository.findByUsername(username);
         }
@@ -134,7 +126,7 @@ public class AuthService {
 
     @Transactional
     public AuthResult updateUserProfile(String accessToken, User updatedUser) {
-        String username = verifyTokenViaRest(accessToken);
+        String username = verifyToken(accessToken);
         if (username == null) {
             return new AuthResult(StatusAuth.TOKEN_INVALID, null);
         }
@@ -144,12 +136,17 @@ public class AuthService {
             return new AuthResult(StatusAuth.USER_NOT_FOUND, null);
         }
 
-        // Aggiorna i campi permessi
         existingUser.setName(updatedUser.getName());
         existingUser.setSurname(updatedUser.getSurname());
-        // Non si aggiorna username, email o password qui per motivi di sicurezza
 
         userRepository.save(existingUser);
         return new AuthResult(StatusAuth.SUCCESS, null);
+    }
+
+    private String verifyToken(String token) {
+        if (jwtTokenService != null) {
+            return jwtTokenService.verifyTokenAndGetSubject(token);
+        }
+        return null;
     }
 }

@@ -37,7 +37,9 @@ services:
       - MYSQL_USER=${MYSQL_USER:-spendy}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-spendypassword}
       - MYSQL_DATABASE_AUTH=${MYSQL_DATABASE_AUTH:-spendy_auth}
-      - GATEWAY_URI=http://gateway-service:7860
+      - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
+      - JWT_EXPIRATION=${JWT_EXPIRATION:-900000}
       - SERVER_PORT=8081
       - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms128m -Xmx256m}
     depends_on:
@@ -61,7 +63,8 @@ services:
       - MYSQL_USER=${MYSQL_USER:-spendy}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD:-spendypassword}
       - MYSQL_DATABASE_EXPENSE=${MYSQL_DATABASE_EXPENSE:-spendy_expense}
-      - GATEWAY_URI=http://gateway-service:7860
+      - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
       - SERVER_PORT=8084
       - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms256m -Xmx512m}
     depends_on:
@@ -81,8 +84,8 @@ services:
       - "7860:7860"
       - "8080:8080"
     environment:
-      - JWT_SECRET=${JWT_SECRET:-CW0I5xfJssGcKmieE4zy+KUP2nRjkRFm4piCXYTMRy8=}
-      - JWT_EXPIRATION=${JWT_EXPIRATION:-900000}
+      - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
+      - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
       - AUTH_SERVICE_URI=http://auth-service:8081
       - EXPENSE_SERVICE_URI=http://expense-service:8084
       - SERVER_PORT=7860

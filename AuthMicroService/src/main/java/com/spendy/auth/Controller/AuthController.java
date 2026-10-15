@@ -34,6 +34,9 @@ public class AuthController {
     @Autowired
     private AuthService authService;
 
+    @Autowired(required = false)
+    private com.spendy.auth.Security.JwtTokenService jwtTokenService;
+
     private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
     private static final Pattern EMAIL_PATTERN = Pattern.compile(EMAIL_REGEX);
 
@@ -225,6 +228,31 @@ public class AuthController {
             content = @Content(mediaType = "text/plain", schema = @Schema(example = "Missing or invalid Authorization header"))
         )
     })
+    private String extractBearerToken(String authHeader) {
+        if (authHeader == null || !authHeader.startsWith("Bearer ") || authHeader.length() <= 7) {
+            return null;
+        }
+        String token = authHeader.substring(7).trim();
+        return token.isEmpty() ? null : token;
+    }
+
+    @Operation(
+        summary = "Get user profile",
+        description = "Fetches authenticated user profile details from the JWT Bearer token claims.",
+        security = @SecurityRequirement(name = "bearerAuth")
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Profile successfully retrieved",
+            content = @Content(mediaType = "application/json", schema = @Schema(implementation = UserProfileResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "401",
+            description = "Missing, invalid, or expired authorization header/token",
+            content = @Content(mediaType = "text/plain", schema = @Schema(example = "Missing or invalid Authorization header"))
+        )
+    })
     @GET
     @GetMapping(value = "/profile", produces = "application/json")
     @Path("/profile")
@@ -240,10 +268,10 @@ public class AuthController {
         @RequestHeader(value = "Authorization", required = false)
         @HeaderParam("Authorization") String authHeader
     ) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        String accessToken = extractBearerToken(authHeader);
+        if (accessToken == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Missing or invalid Authorization header").build();
         }
-        String accessToken = authHeader.substring(7);
         User user = authService.getUserFromToken(accessToken);
         if (user != null) {
             Map<String, String> profileMap = new HashMap<>();
@@ -306,10 +334,10 @@ public class AuthController {
         @HeaderParam("Authorization") String authHeader,
         @org.springframework.web.bind.annotation.RequestBody(required = false) User updatedUser
     ) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        String accessToken = extractBearerToken(authHeader);
+        if (accessToken == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Missing or invalid Authorization header").build();
         }
-        String accessToken = authHeader.substring(7);
         AuthResult result = authService.updateUserProfile(accessToken, updatedUser);
 
         if (result.getStatusAuth() == StatusAuth.SUCCESS) {
@@ -321,6 +349,21 @@ public class AuthController {
         else {
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("An error occurred").build();
         }
+    }
+
+    @Operation(
+        summary = "JWKS Key Set",
+        description = "Provides JSON Web Key Set (JWKS) containing the RSA public key used to verify JWT tokens."
+    )
+    @GET
+    @GetMapping(value = "/jwks.json", produces = "application/json")
+    @Path("/jwks.json")
+    @Produces("application/json")
+    public Response getJwkSet() {
+        if (jwtTokenService != null) {
+            return Response.ok(jwtTokenService.getJwkSetAsMap()).build();
+        }
+        return Response.status(Response.Status.SERVICE_UNAVAILABLE).entity("JWKS service unavailable").build();
     }
 
     @Operation(

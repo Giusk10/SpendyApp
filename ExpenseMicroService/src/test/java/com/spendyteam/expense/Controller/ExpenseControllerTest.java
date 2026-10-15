@@ -214,6 +214,22 @@ class ExpenseControllerTest {
     }
 
     @Test
+    void testDeleteExpenseForbidden() {
+        Map<String, String> body = new HashMap<>();
+        body.put("expenseId", "other-user-expense");
+
+        Response mockResponse = Response.status(Response.Status.FORBIDDEN)
+            .entity("You are not authorized to delete this expense.").build();
+        when(expenseService.deleteExpense(anyString(), anyString()))
+            .thenReturn(mockResponse);
+
+        ResponseEntity<Object> response = expenseController.deleteExpense(body, authHeader);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals("You are not authorized to delete this expense.", response.getBody());
+    }
+
+    @Test
     void testDeleteAllExpensesSuccess() {
         Response mockResponse = Response.ok("All expenses deleted").build();
         when(expenseService.deleteAllExpenses("test-token-12345"))
@@ -309,6 +325,22 @@ class ExpenseControllerTest {
     }
 
     @Test
+    void testUpdateExpenseForbidden() {
+        Map<String, String> body = new HashMap<>();
+        body.put("id", "other-user-expense");
+
+        Response mockResponse = Response.status(Response.Status.FORBIDDEN)
+            .entity("You are not authorized to update this expense.").build();
+        when(expenseService.updateExpense(any(), anyString()))
+            .thenReturn(mockResponse);
+
+        ResponseEntity<Object> response = expenseController.updateExpense(body, authHeader);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals("You are not authorized to update this expense.", response.getBody());
+    }
+
+    @Test
     void testUpdateExpenseException() {
         Map<String, String> body = new HashMap<>();
 
@@ -338,15 +370,29 @@ class ExpenseControllerTest {
         );
 
         ResponseEntity<String> response = expenseController.importCsv(file, null);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
-        assertNotNull(response.getBody());
-        assertTrue(response.getBody().contains("Failed to import CSV"));
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Invalid or expired token.", response.getBody());
     }
 
     @Test
     void testGetExpensesWithoutAuthHeader() {
         ResponseEntity<?> response = expenseController.getExpenses(null);
-        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Invalid or expired token.", response.getBody());
+    }
+
+    @Test
+    void testGetExpensesWithMalformedAuthHeader() {
+        ResponseEntity<?> response = expenseController.getExpenses("Basic dXNlcjpwYXNz");
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Invalid or expired token.", response.getBody());
+    }
+
+    @Test
+    void testGetExpensesWithEmptyBearerToken() {
+        ResponseEntity<?> response = expenseController.getExpenses("Bearer ");
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+        assertEquals("Invalid or expired token.", response.getBody());
     }
 }
 

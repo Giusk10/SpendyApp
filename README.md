@@ -186,8 +186,9 @@ MYSQL_PASSWORD=spendypassword
 MYSQL_DATABASE_AUTH=spendy_auth
 MYSQL_DATABASE_EXPENSE=spendy_expense
 
-# JWT Authentication Config
-JWT_SECRET=CW0I5xfJssGcKmieE4zy+KUP2nRjkRFm4piCXYTMRy8=
+# JWT Authentication Config (RS256 Asymmetric)
+JWT_ISSUER=spendy-auth
+JWT_AUDIENCE=spendy-app
 JWT_EXPIRATION=900000
 
 # Microservice Network Routing
@@ -206,11 +207,11 @@ JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
 | `MYSQL_PASSWORD` | MySQL user password | `spendypassword` |
 | `MYSQL_DATABASE_AUTH` | Database name for Auth Microservice | `spendy_auth` |
 | `MYSQL_DATABASE_EXPENSE` | Database name for Expense Microservice | `spendy_expense` |
-| `JWT_SECRET` | Secret key used to sign and verify HMAC tokens | `CW0I5xfJss...` |
+| `JWT_ISSUER` | Expected JWT issuer claim (`iss`) | `spendy-auth` |
+| `JWT_AUDIENCE` | Expected JWT audience claim (`aud`) | `spendy-app` |
 | `JWT_EXPIRATION` | Access token lifespan in milliseconds | `900000` (15 minutes) |
 | `AUTH_SERVICE_URI` | Destination URL for Auth Microservice | `http://localhost:8081` |
 | `EXPENSE_SERVICE_URI`| Destination URL for Expense Microservice | `http://localhost:8084` |
-| `GATEWAY_URI` | Destination URL for Gateway (used by microservices) | `http://localhost:7860` |
 
 ---
 
@@ -294,6 +295,11 @@ Base path via Gateway: `/Auth/rest/auth`
 - **Endpoint**: `PUT /Auth/rest/auth/updateProfile`
 - **Auth Required**: Yes (`Bearer <accessToken>`)
 - **Request Body**: Updated `User` fields.
+
+#### 6. JWKS Public Keys (RFC 7517)
+- **Endpoint**: `GET /Auth/rest/auth/jwks.json`
+- **Auth Required**: No (Public key set for JWT signature verification)
+- **Response**: RFC 7517 standard JWKS with RSA-2048 public key and key ID.
 
 ---
 

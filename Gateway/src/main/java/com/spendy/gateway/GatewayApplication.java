@@ -26,10 +26,10 @@ public class GatewayApplication {
                 .load();
 
         // Stampa di debug per verificare configurazione
-        if (dotenv.get("JWT_SECRET") == null) {
-            System.out.println("⚠️ ATTENZIONE: Variabile JWT_SECRET non trovata nel .env o file non letto!");
+        if (dotenv.get("JWT_ISSUER") == null && dotenv.get("AUTH_SERVICE_URI") == null) {
+            System.out.println("ℹ️ Configurazione .env non trovata o parziale, verranno usati i default di applicazione.");
         } else {
-            System.out.println("✅ .env caricato correttamente. JWT_SECRET trovato.");
+            System.out.println("✅ .env caricato correttamente per Gateway.");
         }
 
         dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));
