@@ -14,7 +14,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.reactive.function.client.WebClient;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -45,13 +44,6 @@ public class AuthService {
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtTokenService = jwtTokenService;
         this.passwordEncoder = passwordEncoder != null ? passwordEncoder : new BCryptPasswordEncoder(12);
-    }
-
-    /**
-     * Backward-compatible constructor for legacy tests that pass WebClient.
-     */
-    public AuthService(IUserRepository userRepository, WebClient webClient, IRefreshTokenRepository refreshTokenRepository) {
-        this(userRepository, refreshTokenRepository, null, new BCryptPasswordEncoder(12));
     }
 
     @Transactional
