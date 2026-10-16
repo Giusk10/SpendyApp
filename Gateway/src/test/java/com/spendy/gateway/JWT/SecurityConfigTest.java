@@ -100,6 +100,8 @@ class SecurityConfigTest {
         CorsConfiguration config = source.getCorsConfiguration(exchange);
         assertNotNull(config);
         assertTrue(Boolean.TRUE.equals(config.getAllowCredentials()));
-        assertTrue(config.getAllowedOriginPatterns().contains("*"));
+        assertNotNull(config.getAllowedOrigins());
+        assertFalse(config.getAllowedOrigins().contains("*"));
+        assertTrue(config.getAllowedOrigins().contains("http://localhost:3000") || config.getAllowedOrigins().contains("http://localhost:8080"));
     }
 }

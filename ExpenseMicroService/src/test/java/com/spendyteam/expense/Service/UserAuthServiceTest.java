@@ -139,6 +139,7 @@ class UserAuthServiceTest {
     @Test
     void testInitAndLoadPublicKeyFromClasspath() {
         UserAuthService service = new UserAuthService();
+        service.setAllowEphemeralKeys(true);
         service.init();
         assertNotNull(service);
     }

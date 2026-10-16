@@ -98,8 +98,9 @@ class AuthServiceIntegrationTest {
         assertEquals(StatusAuth.SUCCESS, refreshResult.getStatusAuth());
         assertNotNull(refreshResult.getAccessToken());
         assertNotNull(refreshResult.getRefreshToken());
-        verify(refreshTokenRepository, times(1)).delete(refreshToken);
-        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
+        // 1 in login + 2 in refresh (save revoked oldToken and save new RefreshToken)
+        verify(refreshTokenRepository, times(3)).save(any(RefreshToken.class));
+
 
         // 4. AGGIORNAMENTO PROFILO
         String validToken = loginResult.getAccessToken();
@@ -160,7 +161,7 @@ class AuthServiceIntegrationTest {
         AuthResult result = authService.refreshAccessToken(expiredTokenValue);
 
         assertEquals(StatusAuth.TOKEN_EXPIRED, result.getStatusAuth());
-        verify(refreshTokenRepository, times(1)).delete(expiredToken);
+        verify(refreshTokenRepository, times(1)).save(expiredToken);
     }
 
     @Test
@@ -175,8 +176,8 @@ class AuthServiceIntegrationTest {
         AuthResult firstRefresh = authService.refreshAccessToken(oldTokenValue);
 
         assertEquals(StatusAuth.SUCCESS, firstRefresh.getStatusAuth());
-        verify(refreshTokenRepository, times(1)).delete(oldToken);
-        verify(refreshTokenRepository, times(1)).save(any(RefreshToken.class));
+        // Verify current token revoked and new token saved
+        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
 
         // Secondo tentativo di riuso dello stesso token
         when(refreshTokenRepository.findByToken(oldTokenValue)).thenReturn(Optional.empty());

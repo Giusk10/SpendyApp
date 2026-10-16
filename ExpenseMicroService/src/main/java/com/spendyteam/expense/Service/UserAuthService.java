@@ -1,9 +1,13 @@
 package com.spendyteam.expense.Service;
 
+import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSVerifier;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
+import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.DefaultResourceLoader;
@@ -17,17 +21,19 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
-import java.util.Base64;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service responsible for authenticating and resolving user identity
  * by cryptographically validating the RS256 JWT access token locally.
+ * Enforces algorithm restriction, mandatory claims (exp, iss, aud, sub),
+ * and supports key rotation via 'kid'.
  */
 @Service
 public class UserAuthService {
+
+    private static final Logger log = LoggerFactory.getLogger(UserAuthService.class);
 
     @Value("${jwt.issuer:spendy-auth}")
     private String issuer = "spendy-auth";
@@ -41,10 +47,17 @@ public class UserAuthService {
     @Value("${jwt.public-key:}")
     private String publicKeyPem;
 
+    @Value("${jwt.allow-ephemeral-keys:false}")
+    private boolean allowEphemeralKeys = false;
+
+    @Value("${jwt.previous-public-keys:}")
+    private String previousPublicKeysPem = "";
+
     private final ResourceLoader resourceLoader;
     private final WebClient webClient;
     private final String gatewayUri;
     private RSAPublicKey publicKey;
+    private final Map<String, RSAPublicKey> verificationKeys = new ConcurrentHashMap<>();
 
     public UserAuthService() {
         this(new DefaultResourceLoader());
@@ -63,6 +76,10 @@ public class UserAuthService {
         this.audience = audience != null ? audience : "spendy-app";
         this.webClient = null;
         this.gatewayUri = null;
+        this.allowEphemeralKeys = true;
+        if (publicKey != null) {
+            this.verificationKeys.put("default", publicKey);
+        }
     }
 
     /**
@@ -76,6 +93,7 @@ public class UserAuthService {
         this.resourceLoader = new DefaultResourceLoader();
         this.webClient = webClient;
         this.gatewayUri = (gatewayUri != null && !gatewayUri.isBlank()) ? gatewayUri : "http://localhost:7860";
+        this.allowEphemeralKeys = true;
     }
 
     @Autowired
@@ -93,7 +111,62 @@ public class UserAuthService {
         if (this.publicKey == null) {
             this.publicKey = loadPublicKey();
         }
+
+        if (this.publicKey != null) {
+            this.verificationKeys.put("spendy-auth-key-1", this.publicKey);
+        }
+
+        loadPreviousPublicKeys();
+
+        if (this.publicKey == null && !allowEphemeralKeys && webClient == null) {
+            throw new IllegalStateException("CRITICAL SECURITY ERROR: ExpenseMicroService requires RSA public key in production " +
+                    "(jwt.public-key or jwt.public-key-location). Ephemeral key fallback is disabled.");
+        }
     }
+
+    private void loadPreviousPublicKeys() {
+        if (previousPublicKeysPem != null && !previousPublicKeysPem.isBlank()) {
+            String[] entries = previousPublicKeysPem.split(";");
+            for (String entry : entries) {
+                String trimmed = entry.trim();
+                if (trimmed.isEmpty()) continue;
+                String kid;
+                String pem;
+                if (trimmed.contains("=")) {
+                    String[] parts = trimmed.split("=", 2);
+                    kid = parts[0].trim();
+                    pem = parts[1].trim();
+                } else {
+                    kid = "key-" + UUID.randomUUID().toString().substring(0, 8);
+                    pem = trimmed;
+                }
+                try {
+                    RSAPublicKey prev = parsePublicKeyFromPem(pem);
+                    if (prev != null) {
+                        verificationKeys.put(kid, prev);
+                        log.info("Registered previous public key for rotation: '{}'", kid);
+                    }
+                } catch (Exception e) {
+                    log.error("Failed to parse previous public key entry: {}", e.getMessage());
+                }
+            }
+        }
+    }
+
+    public void addVerificationKey(String kid, RSAPublicKey key) {
+        if (kid != null && key != null) {
+            verificationKeys.put(kid, key);
+        }
+    }
+
+    public boolean isAllowEphemeralKeys() {
+        return allowEphemeralKeys;
+    }
+
+    public void setAllowEphemeralKeys(boolean allowEphemeralKeys) {
+        this.allowEphemeralKeys = allowEphemeralKeys;
+    }
+
 
     /**
      * Resolves the username associated with a given JWT token via local cryptographic verification.
@@ -107,37 +180,76 @@ public class UserAuthService {
         }
 
         // 1. Attempt local cryptographic RS256 validation if public key is available
-        if (publicKey != null || canLoadPublicKey()) {
+        if (publicKey != null || canLoadPublicKey() || !verificationKeys.isEmpty()) {
             try {
-                if (publicKey == null) {
+                if (publicKey == null && canLoadPublicKey()) {
                     publicKey = loadPublicKey();
+                    if (publicKey != null) {
+                        verificationKeys.put("default", publicKey);
+                    }
                 }
 
                 SignedJWT signedJWT = SignedJWT.parse(token);
-                JWSVerifier verifier = new RSASSAVerifier(publicKey);
+
+                // Enforce algorithm: strictly RS256
+                if (!JWSAlgorithm.RS256.equals(signedJWT.getHeader().getAlgorithm())) {
+                    log.warn("JWT rejected in ExpenseService: invalid algorithm {}", signedJWT.getHeader().getAlgorithm());
+                    return null;
+                }
+
+                // Resolve key supporting kid rotation
+                String kid = signedJWT.getHeader().getKeyID();
+                RSAPublicKey keyToVerify = resolveVerificationKey(kid);
+                if (keyToVerify == null) {
+                    log.warn("JWT rejected in ExpenseService: no key available for verification (kid: {})", kid);
+                    return null;
+                }
+
+                // Verify signature
+                JWSVerifier verifier = new RSASSAVerifier(keyToVerify);
                 if (!signedJWT.verify(verifier)) {
+                    log.warn("JWT rejected in ExpenseService: invalid signature");
                     return null;
                 }
 
+                JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
+                if (claims == null) {
+                    return null;
+                }
+
+                // Enforce exp
+                Date exp = claims.getExpirationTime();
                 Date now = new Date();
-                Date exp = signedJWT.getJWTClaimsSet().getExpirationTime();
                 if (exp == null || exp.before(now)) {
+                    log.warn("JWT rejected in ExpenseService: token expired or exp missing");
                     return null;
                 }
 
-                String tokenIssuer = signedJWT.getJWTClaimsSet().getIssuer();
-                if (tokenIssuer != null && !issuer.equals(tokenIssuer)) {
+                // Enforce iss
+                String tokenIssuer = claims.getIssuer();
+                if (tokenIssuer == null || !issuer.equals(tokenIssuer)) {
+                    log.warn("JWT rejected in ExpenseService: invalid or missing issuer");
                     return null;
                 }
 
-                List<String> aud = signedJWT.getJWTClaimsSet().getAudience();
-                if (aud != null && !aud.isEmpty() && !aud.contains(audience)) {
+                // Enforce aud
+                List<String> aud = claims.getAudience();
+                if (aud == null || !aud.contains(audience)) {
+                    log.warn("JWT rejected in ExpenseService: invalid or missing audience");
                     return null;
                 }
 
-                return signedJWT.getJWTClaimsSet().getSubject();
+                // Enforce sub
+                String subject = claims.getSubject();
+                if (subject == null || subject.isBlank()) {
+                    log.warn("JWT rejected in ExpenseService: missing or blank subject");
+                    return null;
+                }
+
+                return subject;
             } catch (Exception e) {
-                // If local validation fails or token is malformed, do not fallback to mock unless explicitly intended
+                log.warn("JWT verification exception in ExpenseService: {}", e.getMessage());
+                return null;
             }
         }
 
@@ -158,6 +270,19 @@ public class UserAuthService {
             }
         }
 
+        return null;
+    }
+
+    private RSAPublicKey resolveVerificationKey(String kid) {
+        if (kid != null && verificationKeys.containsKey(kid)) {
+            return verificationKeys.get(kid);
+        }
+        if (this.publicKey != null) {
+            return this.publicKey;
+        }
+        if (!verificationKeys.isEmpty()) {
+            return verificationKeys.values().iterator().next();
+        }
         return null;
     }
 
@@ -191,19 +316,24 @@ public class UserAuthService {
             if (pem == null || pem.isBlank()) {
                 return null;
             }
-            String clean = pem
-                    .replace("\\n", "")
-                    .replace("-----BEGIN RSA PUBLIC KEY-----", "")
-                    .replace("-----END RSA PUBLIC KEY-----", "")
-                    .replace("-----BEGIN PUBLIC KEY-----", "")
-                    .replace("-----END PUBLIC KEY-----", "")
-                    .replaceAll("\\s+", "");
-            byte[] decoded = Base64.getDecoder().decode(clean);
-            X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            return (RSAPublicKey) kf.generatePublic(keySpec);
+            return parsePublicKeyFromPem(pem);
         } catch (Exception e) {
+            log.error("Failed to load RSA public key: {}", e.getMessage());
             return null;
         }
+    }
+
+    private RSAPublicKey parsePublicKeyFromPem(String pem) throws Exception {
+        String clean = pem
+                .replace("\\n", "")
+                .replace("-----BEGIN RSA PUBLIC KEY-----", "")
+                .replace("-----END RSA PUBLIC KEY-----", "")
+                .replace("-----BEGIN PUBLIC KEY-----", "")
+                .replace("-----END PUBLIC KEY-----", "")
+                .replaceAll("\\s+", "");
+        byte[] decoded = Base64.getDecoder().decode(clean);
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
+        KeyFactory kf = KeyFactory.getInstance("RSA");
+        return (RSAPublicKey) kf.generatePublic(keySpec);
     }
 }

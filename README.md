@@ -214,7 +214,12 @@ JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
 | `JWT_EXPIRATION` | Access token lifespan in milliseconds | `900000` (15 minutes) |
 | `JWT_PRIVATE_KEY` | RSA Private Key PEM string (Auth Service secret) | `-----BEGIN PRIVATE KEY-----...` |
 | `JWT_PUBLIC_KEY` | RSA Public Key PEM string (Gateway & Expense secret)| `-----BEGIN PUBLIC KEY-----...` |
+| `JWT_ALLOW_EPHEMERAL_KEYS` | Allow temporary RSA keys (MUST be false in prod, true for dev/test) | `false` |
+| `JWT_ACTIVE_KEY_ID` | Active Key ID (`kid`) used to sign JWTs | `spendy-auth-key-1` |
+| `JWT_PREVIOUS_PUBLIC_KEYS`| Previous RSA public keys for seamless key rotation window | `spendy-auth-key-0=-----BEGIN...` |
 | `JWT_JWK_SET_URI` | Optional JWKS endpoint URL for Gateway dynamic verification | `http://auth-service:8081/rest/auth/jwks.json` |
+| `CORS_ALLOWED_ORIGINS` | Allowlist of trusted client origins (comma-separated, no wildcards) | `http://localhost:3000,http://localhost:8080` |
+| `RATE_LIMITING_ENABLED`| Rate limiting protection against brute force on auth endpoints | `true` |
 | `AUTH_SERVICE_URI` | Destination URL for Auth Microservice | `http://localhost:8081` |
 | `EXPENSE_SERVICE_URI`| Destination URL for Expense Microservice | `http://localhost:8084` |
 

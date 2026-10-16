@@ -92,9 +92,7 @@ public class AuthController {
             responseMap.put("accessToken", result.getAccessToken());
             responseMap.put("refreshToken", result.getRefreshToken());
             return Response.ok(responseMap).build();
-        } else if (result.getStatusAuth() == StatusAuth.USER_NOT_FOUND) {
-            return Response.status(Response.Status.NOT_FOUND).entity("Utente non trovato").build();
-        } else if (result.getStatusAuth() == StatusAuth.INVALID_CREDENTIALS) {
+        } else if (result.getStatusAuth() == StatusAuth.USER_NOT_FOUND || result.getStatusAuth() == StatusAuth.INVALID_CREDENTIALS) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Credenziali errate o non valide").build();
         }
         return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Server error").build();
@@ -364,6 +362,30 @@ public class AuthController {
             return Response.ok(jwtTokenService.getJwkSetAsMap()).build();
         }
         return Response.status(Response.Status.SERVICE_UNAVAILABLE).entity("JWKS service unavailable").build();
+    }
+
+    @Operation(
+        summary = "User logout",
+        description = "Revokes the specified refresh token and invalidates its session family."
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Successfully logged out",
+            content = @Content(mediaType = "application/json", schema = @Schema(example = "{\"message\":\"Logged out successfully\"}"))
+        )
+    })
+    @POST
+    @PostMapping(value = "/logout", consumes = "application/json", produces = "application/json")
+    @Path("/logout")
+    @Consumes("application/json")
+    @Produces("application/json")
+    public Response logout(@org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body) {
+        String refreshToken = body != null ? body.get("refreshToken") : null;
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            authService.logout(refreshToken);
+        }
+        return Response.ok(Map.of("message", "Logged out successfully")).build();
     }
 
     @Operation(

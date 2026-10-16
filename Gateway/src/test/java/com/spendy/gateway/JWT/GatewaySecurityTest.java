@@ -55,6 +55,11 @@ class GatewaySecurityTest {
         public Mono<String> profile() {
             return Mono.just("Profile OK");
         }
+
+        @GetMapping("/Auth/rest/auth/unmapped")
+        public Mono<String> unmappedAuth() {
+            return Mono.just("Unmapped Auth Endpoint");
+        }
     }
 
     @BeforeEach
@@ -202,4 +207,41 @@ class GatewaySecurityTest {
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED);
     }
+
+    @Test
+    void testUnmappedAuthEndpointWithoutToken_ReturnsUnauthorized() {
+        // Confirms that general wildcard .pathMatchers("/Auth/**").permitAll() was removed
+        webTestClient.get().uri("/Auth/rest/auth/unmapped")
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void testProtectedRouteWithDisallowedAlgorithmHS256_ReturnsUnauthorized() throws Exception {
+        byte[] secret = new byte[32];
+        new java.security.SecureRandom().nextBytes(secret);
+        JWSSigner hmacSigner = new com.nimbusds.jose.crypto.MACSigner(secret);
+
+        Date now = new Date();
+        JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+                .subject("attacker")
+                .issuer("spendy-auth")
+                .audience("spendy-app")
+                .issueTime(now)
+                .expirationTime(new Date(now.getTime() + 60000))
+                .build();
+
+        SignedJWT hmacJwt = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.HS256).keyID("spendy-auth-key-1").build(),
+                claimsSet
+        );
+        hmacJwt.sign(hmacSigner);
+        String hmacToken = hmacJwt.serialize();
+
+        webTestClient.get().uri("/Expense/rest/expense/getExpenses")
+                .header("Authorization", "Bearer " + hmacToken)
+                .exchange()
+                .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
 }
+

@@ -72,7 +72,7 @@ class AuthControllerTest {
     }
 
     /**
-     * Verifica login con utente non trovato: deve restituire 404 NOT FOUND e messaggio di errore
+     * Verifica login con utente non trovato: deve restituire 401 UNAUTHORIZED (mitigazione user enumeration) e messaggio di errore
      */
     @Test
     void testLoginUserNotFound() {
@@ -87,9 +87,9 @@ class AuthControllerTest {
         // Esegue il login tramite il controller
         Response response = authController.login(user);
 
-        // Verifica che la risposta sia 404 NOT FOUND e il messaggio corretto
-        assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
-        assertEquals("Utente non trovato", response.getEntity());
+        // Verifica che la risposta sia 401 UNAUTHORIZED e il messaggio corretto
+        assertEquals(Response.Status.UNAUTHORIZED.getStatusCode(), response.getStatus());
+        assertEquals("Credenziali errate o non valide", response.getEntity());
     }
 
     /**

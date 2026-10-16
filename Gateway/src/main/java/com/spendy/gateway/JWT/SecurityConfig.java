@@ -1,5 +1,6 @@
 package com.spendy.gateway.JWT;
 
+import com.nimbusds.jose.JWSAlgorithm;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,6 +33,7 @@ import java.security.KeyFactory;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 
@@ -42,13 +44,27 @@ public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:8080}")
+    private String corsAllowedOrigins = "http://localhost:3000,http://localhost:8080";
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.addAllowedOriginPattern("*");
-        config.addAllowedMethod("*");
-        config.addAllowedHeader("*");
-        config.addExposedHeader("*");
+        
+        List<String> origins = Arrays.stream(corsAllowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty() && !s.equals("*"))
+                .toList();
+
+        if (origins.isEmpty()) {
+            config.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:8080"));
+        } else {
+            config.setAllowedOrigins(origins);
+        }
+
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
+        config.setExposedHeaders(List.of("Authorization"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 
@@ -64,28 +80,39 @@ public class SecurityConfig {
             @Value("${jwt.jwk-set-uri:}") String jwkSetUri,
             @Value("${jwt.issuer:spendy-auth}") String issuer,
             @Value("${jwt.audience:spendy-app}") String audience,
+            @Value("${jwt.allow-ephemeral-keys:false}") boolean allowEphemeralKeys,
             ResourceLoader resourceLoader) {
 
         NimbusReactiveJwtDecoder decoder;
         if (jwkSetUri != null && !jwkSetUri.isBlank()) {
             decoder = NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build();
         } else {
-            RSAPublicKey publicKey = loadPublicKey(publicKeyPem, publicKeyLocation, resourceLoader);
+            RSAPublicKey publicKey = loadPublicKey(publicKeyPem, publicKeyLocation, allowEphemeralKeys, resourceLoader);
             decoder = NimbusReactiveJwtDecoder.withPublicKey(publicKey).build();
         }
 
         OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(issuer);
-        OAuth2TokenValidator<Jwt> withAudience = new DelegatingOAuth2TokenValidator<>(
+        OAuth2TokenValidator<Jwt> strictValidator = new DelegatingOAuth2TokenValidator<>(
                 withIssuer,
                 jwt -> {
-                    List<String> aud = jwt.getAudience();
-                    if (aud != null && aud.contains(audience)) {
-                        return OAuth2TokenValidatorResult.success();
+                    // Enforce algorithm RS256
+                    Object alg = jwt.getHeaders().get("alg");
+                    if (alg == null || !JWSAlgorithm.RS256.getName().equalsIgnoreCase(alg.toString())) {
+                        return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid JWT algorithm: RS256 expected", null));
                     }
-                    return OAuth2TokenValidatorResult
-                            .failure(new OAuth2Error("invalid_token", "Invalid audience", null));
+                    // Enforce audience
+                    List<String> aud = jwt.getAudience();
+                    if (aud == null || !aud.contains(audience)) {
+                        return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid or missing audience", null));
+                    }
+                    // Enforce subject
+                    String sub = jwt.getSubject();
+                    if (sub == null || sub.isBlank()) {
+                        return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Missing or blank subject", null));
+                    }
+                    return OAuth2TokenValidatorResult.success();
                 });
-        decoder.setJwtValidator(withAudience);
+        decoder.setJwtValidator(strictValidator);
         return decoder;
     }
 
@@ -95,8 +122,19 @@ public class SecurityConfig {
             String issuer,
             String audience,
             ResourceLoader resourceLoader) {
-        return reactiveJwtDecoder(publicKeyLocation, publicKeyPem, null, issuer, audience, resourceLoader);
+        return reactiveJwtDecoder(publicKeyLocation, publicKeyPem, null, issuer, audience, true, resourceLoader);
     }
+
+    public ReactiveJwtDecoder reactiveJwtDecoder(
+            String publicKeyLocation,
+            String publicKeyPem,
+            String jwkSetUri,
+            String issuer,
+            String audience,
+            ResourceLoader resourceLoader) {
+        return reactiveJwtDecoder(publicKeyLocation, publicKeyPem, jwkSetUri, issuer, audience, true, resourceLoader);
+    }
+
 
     @Bean
     public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http,
@@ -121,7 +159,7 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/profile").authenticated()
                         .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/updateProfile").authenticated()
                         .pathMatchers(HttpMethod.PUT, "/Auth/rest/auth/updateProfile").authenticated()
-                        .pathMatchers("/Auth/**").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/Auth/rest/auth/logout").authenticated()
                         .pathMatchers("/Expense/**").authenticated()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -137,7 +175,7 @@ public class SecurityConfig {
                 .build();
     }
 
-    private RSAPublicKey loadPublicKey(String pem, String location, ResourceLoader resourceLoader) {
+    private RSAPublicKey loadPublicKey(String pem, String location, boolean allowEphemeralKeys, ResourceLoader resourceLoader) {
         try {
             if ((pem == null || pem.isBlank()) && location != null && !location.isBlank()) {
                 if (resourceLoader != null) {
@@ -150,7 +188,11 @@ public class SecurityConfig {
                 }
             }
             if (pem == null || pem.isBlank()) {
-                log.warn("No RSA public key configured for Gateway via jwt.public-key or jwt.public-key-location. Using an ephemeral RSA public key for local dev startup.");
+                if (!allowEphemeralKeys) {
+                    throw new IllegalStateException("CRITICAL SECURITY ERROR: Gateway requires an RSA public key in production " +
+                            "(set JWT_PUBLIC_KEY, JWT_PUBLIC_KEY_LOCATION, or JWT_JWK_SET_URI). Ephemeral key fallback is disabled.");
+                }
+                log.warn("WARNING: No RSA public key configured for Gateway. Using an ephemeral RSA public key because jwt.allow-ephemeral-keys=true.");
                 KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
                 kpg.initialize(2048);
                 return (RSAPublicKey) kpg.generateKeyPair().getPublic();
@@ -166,6 +208,8 @@ public class SecurityConfig {
             X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
             KeyFactory kf = KeyFactory.getInstance("RSA");
             return (RSAPublicKey) kf.generatePublic(keySpec);
+        } catch (IllegalStateException ise) {
+            throw ise;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load RSA public key for Gateway: " + e.getMessage(), e);
         }

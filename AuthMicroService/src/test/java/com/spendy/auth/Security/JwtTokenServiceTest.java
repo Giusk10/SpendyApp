@@ -131,6 +131,7 @@ class JwtTokenServiceTest {
     @Test
     void testResourceLoaderInit() {
         JwtTokenService serviceFromResources = new JwtTokenService(new DefaultResourceLoader());
+        serviceFromResources.setAllowEphemeralKeys(true);
         serviceFromResources.init();
         assertNotNull(serviceFromResources.getPublicKey());
         assertNotNull(serviceFromResources.getPrivateKey());

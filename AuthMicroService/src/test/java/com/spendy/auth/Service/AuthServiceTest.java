@@ -115,8 +115,8 @@ class AuthServiceTest {
         assertEquals(StatusAuth.SUCCESS, result.getStatusAuth());
         assertEquals("newAccessToken123", result.getAccessToken());
         assertNotNull(result.getRefreshToken());
-        verify(refreshTokenRepository, times(1)).delete(refreshToken);
-        verify(refreshTokenRepository, times(1)).save(any(RefreshToken.class));
+        // Verify current token marked revoked/rotated and new token saved
+        verify(refreshTokenRepository, times(2)).save(any(RefreshToken.class));
     }
 
     @Test
@@ -143,7 +143,7 @@ class AuthServiceTest {
         AuthResult result = authService.refreshAccessToken(expiredToken);
 
         assertEquals(StatusAuth.TOKEN_EXPIRED, result.getStatusAuth());
-        verify(refreshTokenRepository, times(1)).delete(refreshToken);
+        verify(refreshTokenRepository, times(1)).save(refreshToken);
     }
 
     @Test
