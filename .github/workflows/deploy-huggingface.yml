@@ -218,7 +218,7 @@ jobs:
           echo "⏳ Polling endpoint di salute Gateway: $HEALTH_URL ..."
           while [ $ELAPSED -lt $MAX_WAIT ]; do
             # curl con timeout breve per intercettare transitori 502/503/504
-            HTTP_CODE=$(curl -s -k -o /tmp/health_body.json -w "%{http_code}" --connect-timeout 5 --max-time 10 "$HEALTH_URL" 2>/dev/null || echo "000")
+            HTTP_CODE=$(curl -s -o /tmp/health_body.json -w "%{http_code}" --connect-timeout 5 --max-time 10 "$HEALTH_URL" 2>/dev/null || echo "000")
 
             if [ "$HTTP_CODE" = "200" ]; then
               if grep -q '"status":"UP"' /tmp/health_body.json 2>/dev/null; then
@@ -241,11 +241,26 @@ jobs:
           fi
 
           echo "⏳ Verifica instradamento downstream su Auth Service ($AUTH_HEALTH_URL)..."
-          AUTH_CODE=$(curl -s -k -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$AUTH_HEALTH_URL" 2>/dev/null || echo "000")
-          if [ "$AUTH_CODE" = "200" ]; then
-            echo "✅ Route downstream /Auth/rest/auth/health ha risposto 200 OK!"
-          else
-            echo "⚠️  Attenzione: /Auth/rest/auth/health ha risposto HTTP $AUTH_CODE (verificare instradamento)."
+          AUTH_UP=0
+          AUTH_CODE="000"
+          ELAPSED=0
+          while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
+            AUTH_CODE=$(curl -s -o /tmp/auth_health_body.json -w "%{http_code}" --connect-timeout 5 --max-time 10 "$AUTH_HEALTH_URL" 2>/dev/null || echo "000")
+            if [ "$AUTH_CODE" = "200" ] && grep -q '"status":"UP"' /tmp/auth_health_body.json 2>/dev/null; then
+              echo "✅ Route downstream Auth ha risposto 200 OK con stato UP!"
+              AUTH_UP=1
+              break
+            fi
+            echo "   [$ELAPSED/${MAX_WAIT}s] Auth non pronto (HTTP $AUTH_CODE); nuovo tentativo tra ${INTERVAL}s..."
+            sleep "$INTERVAL"
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ "$AUTH_UP" -ne 1 ]; then
+            echo "❌ ERRORE: Auth non ha raggiunto lo stato UP tramite Gateway entro ${MAX_WAIT}s." >&2
+            echo "   Ultimo codice HTTP ricevuto: $AUTH_CODE" >&2
+            echo "   Consultare i log dello Space: https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}" >&2
+            exit 1
           fi
 
       - name: Deployment Pipeline Summary

@@ -17,6 +17,10 @@ services:
       MYSQL_AUTH_PASSWORD: ${MYSQL_AUTH_PASSWORD:-}
       MYSQL_EXPENSE_USER: ${MYSQL_EXPENSE_USER:-}
       MYSQL_EXPENSE_PASSWORD: ${MYSQL_EXPENSE_PASSWORD:-}
+      MYSQL_AUTH_MIGRATION_USER: ${MYSQL_AUTH_MIGRATION_USER:-}
+      MYSQL_AUTH_MIGRATION_PASSWORD: ${MYSQL_AUTH_MIGRATION_PASSWORD:-}
+      MYSQL_EXPENSE_MIGRATION_USER: ${MYSQL_EXPENSE_MIGRATION_USER:-}
+      MYSQL_EXPENSE_MIGRATION_PASSWORD: ${MYSQL_EXPENSE_MIGRATION_PASSWORD:-}
       MYSQL_DATABASE_AUTH: ${MYSQL_DATABASE_AUTH:-spendy_auth}
       MYSQL_DATABASE_EXPENSE: ${MYSQL_DATABASE_EXPENSE:-spendy_expense}
     volumes:
@@ -38,7 +42,7 @@ services:
     build:
       context: .
       target: auth-service
-    container_name: auth-service
+    container_name: spendy-auth-service
     restart: unless-stopped
     expose:
       - "8081"
@@ -48,6 +52,8 @@ services:
       - MYSQL_USER=${MYSQL_AUTH_USER:-${MYSQL_USER:-spendy}}
       - MYSQL_PASSWORD=${MYSQL_AUTH_PASSWORD:-${MYSQL_PASSWORD}}
       - MYSQL_DATABASE_AUTH=${MYSQL_DATABASE_AUTH:-spendy_auth}
+      - MYSQL_AUTH_MIGRATION_USER=${MYSQL_AUTH_MIGRATION_USER:-${MYSQL_AUTH_USER:-${MYSQL_USER:-spendy}}}
+      - MYSQL_AUTH_MIGRATION_PASSWORD=${MYSQL_AUTH_MIGRATION_PASSWORD:-${MYSQL_AUTH_PASSWORD:-${MYSQL_PASSWORD}}}
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
       - JWT_EXPIRATION=${JWT_EXPIRATION:-900000}
@@ -68,6 +74,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 25s
+    volumes:
+      - ./keys:/app/keys:ro
     networks:
       - spendy-network
 
@@ -78,7 +86,7 @@ services:
     build:
       context: .
       target: expense-service
-    container_name: expense-service
+    container_name: spendy-expense-service
     restart: unless-stopped
     expose:
       - "8084"
@@ -88,6 +96,8 @@ services:
       - MYSQL_USER=${MYSQL_EXPENSE_USER:-${MYSQL_USER:-spendy}}
       - MYSQL_PASSWORD=${MYSQL_EXPENSE_PASSWORD:-${MYSQL_PASSWORD}}
       - MYSQL_DATABASE_EXPENSE=${MYSQL_DATABASE_EXPENSE:-spendy_expense}
+      - MYSQL_EXPENSE_MIGRATION_USER=${MYSQL_EXPENSE_MIGRATION_USER:-${MYSQL_EXPENSE_USER:-${MYSQL_USER:-spendy}}}
+      - MYSQL_EXPENSE_MIGRATION_PASSWORD=${MYSQL_EXPENSE_MIGRATION_PASSWORD:-${MYSQL_EXPENSE_PASSWORD:-${MYSQL_PASSWORD}}}
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
       - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
@@ -105,6 +115,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    volumes:
+      - ./keys:/app/keys:ro
     networks:
       - spendy-network
 
@@ -115,7 +127,7 @@ services:
     build:
       context: .
       target: gateway-service
-    container_name: gateway-service
+    container_name: spendy-gateway-service
     restart: unless-stopped
     ports:
       - "${GATEWAY_PORT:-7860}:7860"
@@ -142,6 +154,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    volumes:
+      - ./keys:/app/keys:ro
     networks:
       - spendy-network
 

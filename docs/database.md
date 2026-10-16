@@ -22,7 +22,7 @@ Entrambi gli schemi risiedono su un'istanza MySQL 8.4 isolata nella rete privata
 ```
                             ┌─────────────────────────────────────────┐
                             │    1. Livello Infrastruttura (MySQL)    │
-                            │    File: db/init/init-db.sql            │
+                            │    File: db/init/00-init-db.sql            │
                             │    - Creazione database se assenti      │
                             │    - Assegnazione PRIVILEGI MINIMI      │
                             └────────────────────┬────────────────────┘
@@ -46,30 +46,19 @@ A differenza delle configurazioni predefinite di sviluppo che assegnano `ALL PRI
 - **Operazioni DDL di Migrazione (Flyway)**: `CREATE`, `DROP`, `ALTER`, `INDEX`, `REFERENCES` per creare/modificare tabelle, indici e vincoli di foreign key all'avvio del servizio.
 - **Privilegi Esclusi/Revocati**: Sono tassativamente esclusi permessi amministrativi globali (`*.*`), `GRANT OPTION`, `DROP DATABASE`, `SUPER`, `PROCESS`, `RELOAD`, `SHUTDOWN`, `FILE`. In questo modo un'eventuale vulnerabilità applicativa non può compromettere l'intero server database o cancellare database adiacenti.
 
-### 2.2. Script di Inizializzazione (`db/init/init-db.sql`)
-- **Ruolo**: Eseguito **esclusivamente al primo avvio** del container MySQL quando la directory `/var/lib/mysql` è vuota.
-- **Contenuto**:
-  ```sql
-  CREATE DATABASE IF NOT EXISTS spendy_auth CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-  CREATE DATABASE IF NOT EXISTS spendy_expense CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+### 2.2. Script di Inizializzazione
+- `db/init/00-init-db.sql` crea i due schemi e concede privilegi di compatibilità all'account condiviso.
+- `db/init/99-init-users.sh` viene eseguito dopo la creazione degli schemi. Quando sono configurati gli account dedicati, crea gli account runtime e Flyway, applica grant per schema e revoca i privilegi dell'account condiviso.
+- Gli script in `/docker-entrypoint-initdb.d/` vengono eseguiti **solo quando il volume MySQL è vuoto**. Aggiornare i file non modifica automaticamente i grant di un volume esistente.
 
-  GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES ON spendy_auth.* TO 'spendy'@'%';
-  GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES ON spendy_expense.* TO 'spendy'@'%';
-  FLUSH PRIVILEGES;
-  ```
+### 2.3. Separazione degli Account Runtime e Flyway
+Per il setup locale, `.env.example` propone account separati:
+- `MYSQL_AUTH_USER` / `MYSQL_AUTH_PASSWORD`: runtime Auth, DML sul solo schema `spendy_auth`.
+- `MYSQL_EXPENSE_USER` / `MYSQL_EXPENSE_PASSWORD`: runtime Expense, DML sul solo schema `spendy_expense`.
+- `MYSQL_AUTH_MIGRATION_USER` / `MYSQL_AUTH_MIGRATION_PASSWORD`: account Flyway con DDL sul solo schema Auth.
+- `MYSQL_EXPENSE_MIGRATION_USER` / `MYSQL_EXPENSE_MIGRATION_PASSWORD`: account Flyway con DDL sul solo schema Expense.
 
-### 2.3. Separazione degli Account Applicativi (Auth vs Expense)
-Per ambienti ad alta sicurezza o conformità, SpendyApp supporta la completa segregazione delle utenze:
-1. **Configurazione variabili d'ambiente** (in `.env`):
-   ```properties
-   MYSQL_AUTH_USER=spendy_auth
-   MYSQL_AUTH_PASSWORD=spendy_auth_secure_password
-   MYSQL_EXPENSE_USER=spendy_expense
-   MYSQL_EXPENSE_PASSWORD=spendy_expense_secure_password
-   ```
-2. **Provisioning automatico (`db/init/02-init-users.sh`)**:
-   Se queste variabili sono valorizzate, lo script di inizializzazione crea automaticamente i due utenti dedicati, concede a ciascuno i privilegi minimi esclusivamente sul rispettivo schema (`spendy_auth.*` per auth, `spendy_expense.*` per expense) e revoca i permessi all'utente generico `spendy`.
-3. **Fallback compatibile**: Se le variabili dedicate non sono specificate, il sistema continua a funzionare con l'utente condiviso `spendy` configurato con privilegi minimi.
+Se non si configurano account Flyway distinti, per compatibilità l'account runtime mantiene anche i privilegi DDL necessari a Flyway. La separazione runtime/migrazione completa richiede quindi tutti e quattro gli account dedicati. Le password di `.env.example` sono solo per sviluppo locale e non vanno usate in produzione.
 
 ### 2.4. Migrazioni Applicative (Flyway)
 - **Ruolo**: Versionamento controllato e incrementale della struttura delle tabelle (DDL) nel tempo.
@@ -84,30 +73,11 @@ Per ambienti ad alta sicurezza o conformità, SpendyApp supporta la completa seg
 
 ---
 
-## 3. Procedura di Migrazione Privilegi per Volumi MySQL Esistenti
+## 3. Procedura di Migrazione per Volumi MySQL Esistenti
 
-> [!IMPORTANT]
-> La modifica di `init-db.sql` ha effetto **soltanto sui nuovi container**. Su volumi MySQL esistenti (`spendy-mysql-data`), MySQL non riesegue i file in `/docker-entrypoint-initdb.d/`.
+MySQL non riesegue gli script di `/docker-entrypoint-initdb.d/` su un volume già inizializzato. Per aggiornare gli account senza eliminare database o volumi, effettuare prima un backup ripristinabile e seguire la procedura dettagliata in [`docs/runbooks/mysql-account-migration.md`](runbooks/mysql-account-migration.md).
 
-Per aggiornare un'installazione esistente revocando `ALL PRIVILEGES` e applicando i privilegi minimi **senza cancellare il volume o perdere dati**:
-
-1. Assicurarsi che l'ambiente sia avviato:
-   ```bash
-   ./scripts/dev-up.sh
-   ```
-2. Eseguire lo script di migrazione dei privilegi a caldo:
-   ```bash
-   docker compose exec -i mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" < db/init/migrate-least-privilege.sql
-   ```
-3. Verificare i privilegi attivi assegnati all'utente:
-   ```bash
-   docker compose exec -i mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW GRANTS FOR 'spendy'@'%';"
-   ```
-   L'output mostrerà esclusivamente:
-   ```text
-   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES ON `spendy_auth`.* TO 'spendy'@'%'
-   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP, ALTER, INDEX, REFERENCES ON `spendy_expense`.* TO 'spendy'@'%'
-   ```
+La procedura configura le credenziali in `.env`, esegue il provisioning esplicito con `db/init/99-init-users.sh`, ricrea i microservizi e verifica Flyway e gli smoke test. Non eseguire comandi distruttivi come `docker compose down -v` per applicare la migrazione.
 
 ---
 

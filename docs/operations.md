@@ -107,10 +107,11 @@ I limiti consigliati sono:
 ### 4.4. Verifica e Manutenzione Privilegi Database
 Per controllare i privilegi attivi concessi agli utenti MySQL ed assicurarsi che rispettino il principio del minimo privilegio:
 ```bash
-# Verifica privilegi dell'utente applicativo spendy
-docker compose exec -i mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW GRANTS FOR 'spendy'@'%';"
+# Verifica privilegi degli account runtime e Flyway (adattare i nomi se personalizzati)
+docker compose exec mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW GRANTS FOR 'spendy_auth'@'%';"
+docker compose exec mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW GRANTS FOR 'spendy_auth_migrator'@'%';"
 
-# Applicazione della migrazione dei privilegi a caldo su volumi esistenti (senza perdita dati)
-docker compose exec -i mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" < db/init/migrate-least-privilege.sql
+# Per volumi esistenti: seguire la procedura con backup e verifica
+# docs/runbooks/mysql-account-migration.md
 ```
 
