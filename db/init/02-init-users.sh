@@ -35,14 +35,14 @@ if [ -n "${MYSQL_AUTH_USER:-}" ] && [ -n "${MYSQL_AUTH_PASSWORD:-}" ]; then
 SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_BACKSLASH_ESCAPES');
 CREATE USER IF NOT EXISTS '${MYSQL_AUTH_USER}'@'%' IDENTIFIED BY '${AUTH_PASSWORD_SQL}';
 ALTER USER '${MYSQL_AUTH_USER}'@'%' IDENTIFIED BY '${AUTH_PASSWORD_SQL}';
-if [ -n "${MYSQL_AUTH_MIGRATION_USER:-}" ] && [ -n "${MYSQL_AUTH_MIGRATION_PASSWORD:-}" ]; then
-    GRANT_SQL="GRANT SELECT, INSERT, UPDATE, DELETE ON ${AUTH_DB}.* TO '${MYSQL_AUTH_USER}'@'%';"
-else
-    # Compatibilità: senza account Flyway separato, il runtime deve migrare lo schema.
-    GRANT_SQL="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES, DROP ON ${AUTH_DB}.* TO '${MYSQL_AUTH_USER}'@'%';"
-fi
-mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "$GRANT_SQL"
 EOSQL
+    if [ -n "${MYSQL_AUTH_MIGRATION_USER:-}" ] && [ -n "${MYSQL_AUTH_MIGRATION_PASSWORD:-}" ]; then
+        GRANT_SQL="GRANT SELECT, INSERT, UPDATE, DELETE ON ${AUTH_DB}.* TO '${MYSQL_AUTH_USER}'@'%';"
+    else
+        # Compatibilità: senza account Flyway separato, il runtime deve migrare lo schema.
+        GRANT_SQL="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES, DROP ON ${AUTH_DB}.* TO '${MYSQL_AUTH_USER}'@'%';"
+    fi
+    mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "$GRANT_SQL"
 fi
 
 if [ -n "${MYSQL_EXPENSE_USER:-}" ] && [ -n "${MYSQL_EXPENSE_PASSWORD:-}" ]; then
@@ -53,13 +53,13 @@ if [ -n "${MYSQL_EXPENSE_USER:-}" ] && [ -n "${MYSQL_EXPENSE_PASSWORD:-}" ]; the
 SET SESSION sql_mode = CONCAT(@@sql_mode, ',NO_BACKSLASH_ESCAPES');
 CREATE USER IF NOT EXISTS '${MYSQL_EXPENSE_USER}'@'%' IDENTIFIED BY '${EXPENSE_PASSWORD_SQL}';
 ALTER USER '${MYSQL_EXPENSE_USER}'@'%' IDENTIFIED BY '${EXPENSE_PASSWORD_SQL}';
-if [ -n "${MYSQL_EXPENSE_MIGRATION_USER:-}" ] && [ -n "${MYSQL_EXPENSE_MIGRATION_PASSWORD:-}" ]; then
-    GRANT_SQL="GRANT SELECT, INSERT, UPDATE, DELETE ON ${EXPENSE_DB}.* TO '${MYSQL_EXPENSE_USER}'@'%';"
-else
-    GRANT_SQL="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES, DROP ON ${EXPENSE_DB}.* TO '${MYSQL_EXPENSE_USER}'@'%';"
-fi
-mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "$GRANT_SQL"
 EOSQL
+    if [ -n "${MYSQL_EXPENSE_MIGRATION_USER:-}" ] && [ -n "${MYSQL_EXPENSE_MIGRATION_PASSWORD:-}" ]; then
+        GRANT_SQL="GRANT SELECT, INSERT, UPDATE, DELETE ON ${EXPENSE_DB}.* TO '${MYSQL_EXPENSE_USER}'@'%';"
+    else
+        GRANT_SQL="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES, DROP ON ${EXPENSE_DB}.* TO '${MYSQL_EXPENSE_USER}'@'%';"
+    fi
+    mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e "$GRANT_SQL"
 fi
 
 # Flyway riceve account separati, con DDL limitato allo schema del servizio.
