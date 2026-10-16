@@ -18,54 +18,72 @@ app_port: 7860
 [![Hibernate](https://img.shields.io/badge/Hibernate-JPA_6-59666C?style=flat&logo=hibernate&logoColor=white)](https://hibernate.org/)
 [![Flyway](https://img.shields.io/badge/Flyway-Migrations-CC0200?style=flat&logo=flyway&logoColor=white)](https://flywaydb.org/)
 [![Apache OpenNLP](https://img.shields.io/badge/Apache_OpenNLP-2.3.0-D22128?style=flat&logo=apache&logoColor=white)](https://opennlp.apache.org/)
+[![Nimbus JOSE](https://img.shields.io/badge/Nimbus-RS256_JWT-blue?style=flat)](https://connect2id.com/products/nimbus-jose-jwt)
 [![Docker](https://img.shields.io/badge/Docker-Multi--stage-2496ED?style=flat&logo=docker&logoColor=white)](https://www.docker.com/)
 [![License](https://img.shields.io/badge/License-AGPLv3-blue.svg)](LICENSE)
 
-**Spendy** is a high-performance, microservices-based backend platform designed for **personal finance management** as well as shared households and roommates to track daily expenses, import bank statements, and analyze cash flows with automated debt settlement. 
+**Spendy** è una piattaforma backend ad alte prestazioni basata su microservizi, progettata per la **gestione finanziaria personale** e per la gestione delle spese condivise in famiglie o coinquilini: tracciamento delle spese giornaliere, importazione parallela di estratti conto bancari CSV, analisi aggregata dei flussi di cassa e categorizzazione automatica basata su Machine Learning.
 
-Engineered on **Java 21** and **Spring Boot 3.5**, Spendy utilizes a reactive **Spring Cloud Gateway**, **virtual threads**, **MySQL relational databases** with **Spring Data JPA** and **Hibernate**, automated **Flyway** schema migrations, and an integrated **Apache OpenNLP Machine Learning** engine for automated expense categorization.
+Ingegnerizzato su **Java 21 LTS** e **Spring Boot 3.5**, Spendy utilizza un **API Gateway reattivo basato su Spring WebFlux e Reactor Netty**, **Virtual Threads (Project Loom)**, database relazionali **MySQL 8.4** con **Spring Data JPA** e **Hibernate 6**, migrazioni dello schema versionate con **Flyway**, autenticazione asimmetrica **RSA (RS256)** con **Refresh Token Rotation**, e un motore di Machine Learning locale basato su **Apache OpenNLP**.
 
 ---
 
-## 📑 Table of Contents
+## 📑 Indice dei Contenuti
 
-- [System Architecture](#-system-architecture)
-- [Microservices Breakdown](#-microservices-breakdown)
+- [Documentazione Tecnica Completa](#-documentazione-tecnica-completa)
+- [Architettura del Sistema](#-architettura-del-sistema)
+- [Scomposizione dei Microservizi](#-scomposizione-dei-microservizi)
   - [API Gateway](#1-api-gateway)
   - [Auth Microservice](#2-auth-microservice)
   - [Expense Microservice](#3-expense-microservice)
-- [Machine Learning & Categorization Engine](#-machine-learning--categorization-engine)
-- [Tech Stack & Libraries](#-tech-stack--libraries)
-- [Environment Configuration](#-environment-configuration)
-- [REST API Reference](#-rest-api-reference)
-  - [Authentication Endpoints](#authentication-endpoints)
-  - [Expense Endpoints](#expense-endpoints)
-- [Getting Started & Local Setup](#-getting-started--local-setup)
-- [Docker & Containerized Deployment](#-docker--containerized-deployment)
-- [Testing & Quality Assurance](#-testing--quality-assurance)
-  - [Unit & Integration Tests](#unit--integration-tests)
-- [License](#-license)
+- [Motore di Categorizzazione Machine Learning](#-motore-di-categorizzazione-machine-learning)
+- [Stack Tecnologico & Librerie](#-stack-tecnologico--librerie)
+- [Configurazione delle Variabili d'Ambiente](#-configurazione-delle-variabili-dambiente)
+- [Riferimento Rapido API REST](#-riferimento-rapido-api-rest)
+- [Installazione e Avvio Locale](#-installazione-e-avvio-locale)
+- [Deployment Docker e Containerizzazione](#-deployment-docker-e-containerizzazione)
+- [Test e Assicurazione della Qualità](#-test-e-assicurazione-della-qualit%C3%A0)
+- [Licenza](#-licenza)
 
 ---
 
-## 🏗 System Architecture
+## 📚 Documentazione Tecnica Completa
 
-Spendy follows an asynchronous, cloud-native microservices architecture orchestrated behind a reactive reverse proxy (API Gateway). The Gateway manages SSL termination, unified CORS headers, JWT authentication filtering, and internal service route rewrites.
+La documentazione approfondita dell'intero sistema è consultabile nella directory [`docs/`](docs/):
+
+| Documento | Descrizione |
+| :--- | :--- |
+| 🏛️ [Architettura del Sistema](docs/architecture.md) | Stile architetturale, componenti, flussi sincroni/asincroni, confini dati e diagrammi Mermaid. |
+| 🔌 [Specifiche API REST](docs/api.md) | Contratti di tutti gli endpoint, metodi HTTP, parametri, schemi di risposta ed esempi JSON. |
+| 🔐 [Autenticazione & Sessioni](docs/authentication.md) | Crittografia asimmetrica RS256, BCrypt, Refresh Token Rotation, hashing SHA-256 e rate limiting. |
+| 🗄️ [Modello Dati & Persistenza](docs/data-model.md) | Schemi relazionali `spendy_auth` e `spendy_expense`, diagramma ER, indici e migrazioni Flyway. |
+| 💻 [Guida allo Sviluppo](docs/development.md) | Setup ambiente locale, struttura directory, convenzioni di codice, Virtual Threads e git workflow. |
+| 🐳 [Deployment & Operazioni](docs/deployment.md) | Orchestrazione Docker Compose, container All-in-One per Hugging Face Spaces e monitoraggio. |
+| 🧪 [Strategia di Test & JaCoCo](docs/testing.md) | Suite di 170 test unitari, integration test con database H2 in memoria e metriche di code coverage. |
+| 🛡️ [Analisi di Sicurezza & Threat Model](docs/security.md) | Superfici d'attacco, mitigazione timing attack, protezione IDOR, CORS e gestione segreti. |
+| 📜 [Architecture Decision Records (ADR)](docs/decisions/0001-migrazione-mysql-flyway.md) | Decisioni architetturali motivate (MySQL, RSA RS256, Gateway reattivo, OpenNLP, Token Rotation). |
+| 📋 [Changelog Completo](CHANGELOG.md) | Cronologia ufficiale dei rilasci e commit significativi ricostruita dalla storia Git. |
+
+---
+
+## 🏗 Architettura del Sistema
+
+Spendy adotta un'architettura a microservizi asincrona e cloud-native protetta da un reverse proxy perimetrale reattivo (**API Gateway**). Il Gateway gestisce l'autenticazione perimetrale OAuth2, la validazione crittografica della firma JWT, le policy CORS globali, la riscrittura dei percorsi verso i servizi interni e la sanitizzazione degli header.
 
 ```mermaid
 flowchart TD
     Client["Client Applications<br/>(iOS App / Web Client)"]
     
     subgraph Edge ["Edge Layer"]
-        Gateway["Spring Cloud Gateway<br/>(Port: 7860 / 8080)<br/>- Reactive Netty WebFlux<br/>- JWT Filter & Token Verification<br/>- CORS & Security Policy"]
+        Gateway["Spring Cloud Gateway<br/>(Port: 7860 / 8080)<br/>- Reactive Netty WebFlux<br/>- Virtual Threads (Java 21)<br/>- RS256 JWT Verification<br/>- CORS & Security Policy"]
     end
 
-    subgraph Microservices ["Microservices Layer (Internal)"]
-        AuthService["AuthMicroService<br/>(Port: 8081)<br/>- Jersey / Spring Boot<br/>- BCrypt Password Hashing<br/>- JWT Token Generation & Rotation"]
-        ExpenseService["ExpenseMicroService<br/>(Port: 8084)<br/>- Jersey / Spring Boot<br/>- Smart CSV Parsing<br/>- OpenNLP ML Categorizer<br/>- Expense Analytics & CRUD"]
+    subgraph Microservices ["Microservices Layer (Internal Network)"]
+        AuthService["AuthMicroService<br/>(Port: 8081)<br/>- Spring Boot & Jersey<br/>- BCrypt Password Hashing (Cost 12)<br/>- RS256 Asymmetric JWT Signer<br/>- Refresh Token Rotation (SHA-256)"]
+        ExpenseService["ExpenseMicroService<br/>(Port: 8084)<br/>- Spring Boot MVC<br/>- Parallel CSV Parser (Virtual Threads)<br/>- OpenNLP ML Categorizer<br/>- Throttled Batch Writer (Semaphore)"]
     end
 
-    subgraph DataStore ["Data Layer (MySQL 8.x)"]
+    subgraph DataStore ["Data Layer (MySQL 8.4)"]
         AuthDB[("MySQL: spendy_auth<br/>(users, refresh_tokens)")]
         ExpenseDB[("MySQL: spendy_expense<br/>(expenses)")]
     end
@@ -79,430 +97,238 @@ flowchart TD
 
 ---
 
-## 🧩 Microservices Breakdown
+## 🧩 Scomposizione dei Microservizi
 
 ### 1. API Gateway
 - **Directory**: `Gateway/`
-- **Port**: `7860` (Production / Hugging Face Spaces) or `8080` (Local fallback)
-- **Role**: Single entry point for all incoming traffic.
-- **Key Features**:
-  - Non-blocking reactive routing powered by **Spring WebFlux** and **Reactor Netty**.
-  - Java 21 **Virtual Threads** enabled (`spring.threads.virtual.enabled=true`).
-  - Pre-routing `JWTAuthenticationFilter` validating Bearer tokens against the HMAC SHA secret.
-  - Path rewriting rules:
-    - `/Auth/**` &rarr; mapped to `AuthMicroService`
-    - `/Expense/**` &rarr; mapped to `ExpenseMicroService`
-  - Fine-grained CORS configuration for web clients and local development environments.
+- **Porta**: `7860` (Produzione / Hugging Face Spaces) o `8080` (Fallback locale)
+- **Tecnologie**: Spring Cloud Gateway Server WebFlux, Reactor Netty, Java 21 Virtual Threads.
+- **Funzionalità Chiave**:
+  - Routing non bloccante reattivo verso i microservizi interni.
+  - Verifica perimetrale dei token JWT Bearer tramite chiave pubblica RSA (RS256) o endpoint JWKS RFC 7517.
+  - Riscrittura trasparente dei percorsi (`/Auth/**` e `/Expense/**`).
+  - Sanificazione preventiva degli header con rimozione di `X-Auth-User` e `X-User-Id` per bloccare attacchi di spoofing.
+  - Deduplica degli header CORS verso i client Web.
+  - Swagger UI aggregata (`/swagger-ui.html`) con le specifiche OpenAPI unificate di tutti i microservizi.
 
 ### 2. Auth Microservice
 - **Directory**: `AuthMicroService/`
-- **Port**: `8081`
-- **Role**: Identity provider and account lifecycle management.
-- **Key Features**:
-  - User registration with regex email validation and duplicate checking.
-  - Secure credential authentication utilizing **jBCrypt** with salted hashes.
-  - JWT Access Token generation (15-minute validity) alongside Refresh Token rotation.
-  - User profile retrieval and updating (`/profile`, `/updateProfile`).
-  - Persistence backed by MySQL with Spring Data JPA and automated Flyway migrations (`spendy_auth` schema).
+- **Porta**: `8081`
+- **Tecnologie**: Spring Boot 3.5, Jersey 3.x, Spring Data JPA, Hibernate 6, Flyway, jBCrypt, Nimbus JOSE.
+- **Funzionalità Chiave**:
+  - Registrazione utenti con validazione regex di email e username e hashing password con **BCrypt (costo 12)**.
+  - Login con mitigazione dei timing attack tramite hash BCrypt fittizio per contrastare l'enumerazione utenti.
+  - Emissione di Access Token JWT firmati con chiave privata RSA a 2048 bit (durata: 15 minuti).
+  - Refresh Token Rotation atomica con rilevamento del riutilizzo (`family_id`), revoca a catena e salvataggio nel database unicamente del digest **SHA-256**.
+  - Filtro [RateLimitingFilter](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java) con verifica rigorosa dei proxy fidati.
+  - Endpoint pubblico RFC 7517 `/rest/auth/jwks.json`.
 
 ### 3. Expense Microservice
 - **Directory**: `ExpenseMicroService/`
-- **Port**: `8084`
-- **Role**: Financial management, transaction aggregation, and statement parsing.
-- **Key Features**:
-  - **Smart CSV Statement Importer**: Automatically detects column formats and delimiters (semicolon, comma, tab) from bank statements (e.g., Revolut, Intesa Sanpaolo, N26).
-  - **Expense Analytics**: Aggregate expense figures by exact dates, monthly windows, and yearly breakdowns.
-  - **Full Transaction CRUD**: Create, read, update, single delete, and bulk wipe transactions linked to the authenticated user ID.
-  - **Dual Categorization**: Real-time category classification on imported and manually added expenses.
-  - **Relational Persistence**: Spring Data JPA / Hibernate mapped to MySQL `expenses` table (`spendy_expense` schema) with Flyway migrations.
+- **Porta**: `8084`
+- **Tecnologie**: Spring Boot 3.5, Spring Data JPA, Hibernate 6, Apache OpenNLP 2.3.0, OpenCSV 5.9, Virtual Threads.
+- **Funzionalità Chiave**:
+  - **Smart CSV Parser**: Riconoscimento automatico del delimitatore (virgola, punto e virgola, tabulatore) ed elaborazione parallela delle righe tramite Virtual Threads di Java 21.
+  - **Batch Persistence Throttling**: Scrittura a lotti di 500 record disciplinata da `Semaphore(10)` per salvaguardare il connection pool MySQL HikariCP.
+  - **Classificazione AI Dual-Layer**: Predizione della categoria di spesa con Machine Learning OpenNLP e fallback euristico deterministico.
+  - **Aggregazioni Finanziarie SQL**: Calcolo dei totali mensili e annuali push-down a livello database con query native `DATE_FORMAT`.
+  - **CRUD Completo & Prevenzione IDOR**: Creazione, consultazione, aggiornamento e cancellazione sicura con verifica formale della proprietà del record.
 
 ---
 
-## 🤖 Machine Learning & Categorization Engine
+## 🤖 Motore di Categorizzazione Machine Learning
 
-Expenses are classified using a **dual-layer intelligence strategy** located in `ExpenseMicroService`:
+Le transazioni finanziarie vengono classificate tramite un'architettura **ibrida a due stadi** integrata in `ExpenseMicroService`:
 
 ```mermaid
 flowchart LR
-    Input["Transaction Description<br/>(e.g., 'PAGAMENTO POS CONAD')"] --> Preprocess["Tokenizer & Lowercase Normalizer"]
-    Preprocess --> OpenNLP{"OpenNLP DoccatModel<br/>Available?"}
-    OpenNLP -- Yes --> MaxEnt["Maximum Entropy ML Categorizer<br/>(expense-model.bin)"]
-    OpenNLP -- No / Low Confidence --> Fallback["Rule-Based Fallback Engine<br/>(ExpenseClassifier)"]
-    MaxEnt --> Category["Resolved Category<br/>(e.g., 'Supermercati e Alimentari')"]
+    Input["Descrizione Transazione<br/>(es. 'PAGAMENTO POS CONAD')"] --> Preprocess["Tokenizer & Lowercase Normalizer"]
+    Preprocess --> OpenNLP{"Modello OpenNLP<br/>(expense-model.bin)?"}
+    OpenNLP -- Disponibile --> MaxEnt["Classificatore Maximum Entropy<br/>(DocumentCategorizerME)"]
+    OpenNLP -- Errore / Assente --> Fallback["Fallback Euristico Deterministico<br/>(ExpenseClassifier)"]
+    MaxEnt --> Category["Categoria Assegnata<br/>(es. 'Supermercati e Alimentari')"]
     Fallback --> Category
 ```
 
-1. **Machine Learning Model (`SmartCategorizerService`)**:
-   - Built on **Apache OpenNLP Maximum Entropy (MaxEnt)** document categorization (`DocumentCategorizerME`).
-   - Trained on financial transaction datasets via `ExpenseModelTrainer.java` (`100 iterations`, `cutoff = 0`).
-   - Automatically loads pre-trained model binary (`expense-model.bin`) from application resources or local filesystem.
-2. **Deterministic Fallback (`ExpenseClassifier`)**:
-   - Keyword dictionary mapping common merchants and services when ML model confidence requires reinforcement:
-     - **Supermercati e Alimentari**: *Carrefour, Lidl, Conad, Sole 365, Green Garden, Market*
-     - **Ristorazione e Bar**: *McDonald's, Burger King, KFC, Cafes, Pizzerias*
-     - **Abbonamenti e Servizi Digitali**: *Netflix, Spotify, Amazon Prime, Disney+, Google One*
-     - **Trasporti**: *Uber, FREE NOW, Trenitalia, Taxi, Flights*
-     - **Carburante e Auto**: *Gas, Fuel, Petrol stations*
-     - **Alloggi e Viaggi**: *Airbnb, Booking.com, Hotels*
-     - **Shopping e Abbigliamento**: *Zalando, Vinted, Douglas*
+1. **Modello Machine Learning (`SmartCategorizerService`)**:
+   - Algoritmo di classificazione a Massima Entropia (**MaxEnt**) addestrato tramite [ExpenseModelTrainer.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/ExpenseModelTrainer.java).
+   - Esecuzione locale in microsecondi senza trasmissione di dati riservati a server o LLM esterni (GDPR compliant).
+2. **Dizionario Euristico di Fallback (`ExpenseClassifier`)**:
+   - Assicura la classificazione anche in caso di formati anomali per macro-categorie: *Supermercati e Alimentari*, *Ristorazione e Bar*, *Abbonamenti e Servizi Digitali*, *Trasporti*, *Carburante e Auto*, *Alloggi e Viaggi*, *Shopping e Abbigliamento*, *Pagamenti e Trasferimenti*.
 
 ---
 
-## 🛠 Tech Stack & Libraries
+## 🛠 Stack Tecnologico & Librerie
 
-| Category | Technology | Description |
+| Categoria | Tecnologia | Descrizione |
 | :--- | :--- | :--- |
-| **Language** | Java 21 LTS | Utilizing modern language features and Virtual Threads (Project Loom) |
-| **Framework** | Spring Boot 3.5.0 | Microservice runtime and dependency injection container |
-| **Gateway** | Spring Cloud Gateway | Reactive reverse proxy built on Spring WebFlux & Reactor Netty |
-| **REST APIs** | Jakarta RESTful Web Services / Jersey | JAX-RS implementation for service endpoint mapping |
-| **Database** | MySQL 8.x | Relational database (`spendy_auth` and `spendy_expense` schemas) |
-| **ORM / Persistence** | Spring Data JPA & Hibernate 6 | Relational mapping, connection pooling (HikariCP), batch inserts |
-| **Schema Migrations** | Flyway | Automated versioned database migrations (`db/migration/V1__*.sql`) |
-| **Security** | Auth0 `java-jwt` & `jjwt` | HMAC SHA token creation, parsing, and claims verification |
-| **Cryptography** | jBCrypt 0.4 | Salted one-way password hashing |
-| **Machine Learning**| Apache OpenNLP 2.3.0 | Maximum Entropy natural language document categorization |
-| **CSV Parsing** | OpenCSV 5.9 | Robust delimited file parser for financial statement imports |
-| **Build System** | Maven 3.9+ | Multi-module build management with `license-maven-plugin` |
-| **Testing** | JUnit 5, Mockito, JaCoCo, H2 | Unit tests, mock slices, and JPA integration tests |
-| **Deployment** | Docker & Docker Compose | Multi-stage lightweight OCI container image and compose orchestration |
+| **Linguaggio** | Java 21 LTS | Utilizzo di Virtual Threads (Project Loom) e feature moderne del linguaggio |
+| **Framework** | Spring Boot 3.5.0 | Runtime modulare, dependency injection e container applicativo |
+| **API Gateway** | Spring Cloud Gateway | Reverse proxy reattivo asincrono su Spring WebFlux e Reactor Netty |
+| **REST APIs** | Spring Web & Jersey JAX-RS | Gestione endpoint REST, DTO e validazione |
+| **Database** | MySQL 8.4 LTS | Database relazionale con schemi isolati (`spendy_auth`, `spendy_expense`) |
+| **ORM / Persistenza** | Spring Data JPA & Hibernate 6 | Mappatura relazionale, connection pool HikariCP, batch inserts a 500 record |
+| **Schema Migrations** | Flyway | Migrazioni DDL versionate e automatiche all'avvio (`db/migration/`) |
+| **Crittografia & JWT** | Nimbus JOSE+JWT & Spring OAuth2 | Firma e verifica asimmetrica RS256 con supporto Key ID (`kid`) e JWKS |
+| **Hashing Credenziali** | jBCrypt 0.4 (Cost 12) | Hashing salted delle password con verifica a tempo costante |
+| **Machine Learning** | Apache OpenNLP 2.3.0 | Classificatore documentale Maximum Entropy per categorizzazione spese |
+| **CSV Processing** | OpenCSV 5.9 | Parser delimitato con auto-rilevamento separatori |
+| **Build System** | Maven 3.9+ | Gestione multi-modulo e plugin `license-maven-plugin` |
+| **Testing** | JUnit 5, Mockito, H2, JaCoCo | Suite di 170 test unitari, test di sicurezza e metriche di copertura |
+| **Containerizzazione** | Docker & Docker Compose | Immagine OCI multi-stage rootless (`user:1000`) e compose distribuito |
 
 ---
 
-## ⚙️ Environment Configuration
+## ⚙️ Configurazione delle Variabili d'Ambiente
 
-Spendy utilizes a root `.env` file (loaded via `dotenv-java` across all modules) or native OS environment variables in production.
+SpendyApp carica le configurazioni tramite il file `.env` posizionato nella root o mediante variabili d'ambiente di sistema:
 
-Create a `.env` file in the root directory:
+```bash
+cp .env.example .env
+```
 
+Configurazione essenziale:
 ```env
-# MySQL Database Connection Settings
+# Database MySQL
 MYSQL_HOST=localhost
 MYSQL_PORT=3306
 MYSQL_USER=spendy
-MYSQL_PASSWORD=spendypassword
+MYSQL_PASSWORD=spendy_user_secret_change_in_prod
+MYSQL_ROOT_PASSWORD=spendy_root_secret_change_in_prod
 MYSQL_DATABASE_AUTH=spendy_auth
 MYSQL_DATABASE_EXPENSE=spendy_expense
 
-# JWT Authentication Config (RS256 Asymmetric Secrets)
+# JWT RS256 Asimmetrico
 JWT_ISSUER=spendy-auth
 JWT_AUDIENCE=spendy-app
 JWT_EXPIRATION=900000
-# In production, keys are injected via secrets (PEM strings or mounted paths)
+JWT_ALLOW_EPHEMERAL_KEYS=false
+JWT_ACTIVE_KEY_ID=spendy-auth-key-1
+
+# In produzione, specificare le chiavi RSA tramite PEM:
 # JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
 # JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
-# JWT_JWK_SET_URI=http://auth-service:8081/rest/auth/jwks.json
 
-# Microservice Network Routing
+# Routing dei Microservizi
 AUTH_SERVICE_URI=http://localhost:8081
 EXPENSE_SERVICE_URI=http://localhost:8084
-
-# JVM Options (Optional)
-JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
 ```
 
-| Variable | Description | Example |
+*Per la descrizione dettagliata di tutte le variabili supportate, consultare la [Guida al Deployment](docs/deployment.md#2-tabella-completa-delle-variabili-dambiente).*
+
+---
+
+## 🔌 Riferimento Rapido API REST
+
+Tutte le chiamate dall'esterno devono essere inviate verso l'**API Gateway**:
+- **URL Locale**: `http://localhost:7860` (o `http://localhost:8080`)
+- **Documentazione Swagger UI**: `http://localhost:7860/swagger-ui.html`
+
+### Endpoint di Autenticazione (`/Auth/rest/auth/`)
+| Metodo | Endpoint | Autenticazione | Descrizione |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/Auth/rest/auth/register` | No | Registrazione nuovo utente (rate limit: 5/min). |
+| `POST` | `/Auth/rest/auth/login` | No | Login con username o email (rate limit: 10/min). |
+| `POST` | `/Auth/rest/auth/refresh` | No | Rotazione del refresh token con verifica contro il riutilizzo. |
+| `GET` | `/Auth/rest/auth/profile` | `Bearer <token>` | Recupero dati anagrafici del profilo utente. |
+| `PUT` | `/Auth/rest/auth/updateProfile` | `Bearer <token>` | Aggiornamento nome e cognome utente. |
+| `POST` | `/Auth/rest/auth/logout` | No | Invalida il refresh token e revoca l'intera sessione. |
+| `GET` | `/Auth/rest/auth/jwks.json` | No | Set di chiavi pubbliche RSA RFC 7517. |
+| `GET` | `/Auth/rest/auth/health` | No | Controllo stato operativo del servizio Auth. |
+
+### Endpoint Gestione Spese (`/Expense/rest/expense/`)
+*Tutti gli endpoint di spesa richiedono l'header `Authorization: Bearer <accessToken>`.*
+
+| Metodo | Endpoint | Descrizione |
 | :--- | :--- | :--- |
-| `MYSQL_HOST` | MySQL hostname or Docker service name | `localhost` or `mysql` |
-| `MYSQL_PORT` | MySQL server port | `3306` |
-| `MYSQL_USER` | MySQL database user | `spendy` (or `root`) |
-| `MYSQL_PASSWORD` | MySQL user password | `spendypassword` |
-| `MYSQL_DATABASE_AUTH` | Database name for Auth Microservice | `spendy_auth` |
-| `MYSQL_DATABASE_EXPENSE` | Database name for Expense Microservice | `spendy_expense` |
-| `JWT_ISSUER` | Expected JWT issuer claim (`iss`) | `spendy-auth` |
-| `JWT_AUDIENCE` | Expected JWT audience claim (`aud`) | `spendy-app` |
-| `JWT_EXPIRATION` | Access token lifespan in milliseconds | `900000` (15 minutes) |
-| `JWT_PRIVATE_KEY` | RSA Private Key PEM string (Auth Service secret) | `-----BEGIN PRIVATE KEY-----...` |
-| `JWT_PUBLIC_KEY` | RSA Public Key PEM string (Gateway & Expense secret)| `-----BEGIN PUBLIC KEY-----...` |
-| `JWT_ALLOW_EPHEMERAL_KEYS` | Allow temporary RSA keys (MUST be false in prod, true for dev/test) | `false` |
-| `JWT_ACTIVE_KEY_ID` | Active Key ID (`kid`) used to sign JWTs | `spendy-auth-key-1` |
-| `JWT_PREVIOUS_PUBLIC_KEYS`| Previous RSA public keys for seamless key rotation window | `spendy-auth-key-0=-----BEGIN...` |
-| `JWT_JWK_SET_URI` | Optional JWKS endpoint URL for Gateway dynamic verification | `http://auth-service:8081/rest/auth/jwks.json` |
-| `CORS_ALLOWED_ORIGINS` | Allowlist of trusted client origins (comma-separated, no wildcards) | `http://localhost:3000,http://localhost:8080` |
-| `RATE_LIMITING_ENABLED`| Rate limiting protection against brute force on auth endpoints | `true` |
-| `AUTH_SERVICE_URI` | Destination URL for Auth Microservice | `http://localhost:8081` |
-| `EXPENSE_SERVICE_URI`| Destination URL for Expense Microservice | `http://localhost:8084` |
+| `POST` | `/Expense/rest/expense/import` | Importazione estratto conto CSV in parallelo con auto-categorizzazione AI. |
+| `GET` | `/Expense/rest/expense/getExpenses` | Lista completa delle spese dell'utente ordinate per data crescente. |
+| `POST` | `/Expense/rest/expense/getExpenseByDate` | Ricerca spese comprese tra `startedDate` e `completedDate`. |
+| `POST` | `/Expense/rest/expense/getExpenseByMonth` | Filtro spese per mese (`month`) e anno (`year`). |
+| `POST` | `/Expense/rest/expense/getMonthlyAmountOfYear` | Aggregazione totale spese mese per mese per un dato anno (`year`). |
+| `POST` | `/Expense/rest/expense/addExpense` | Aggiunta singola transazione (assegnazione automatica categoria AI). |
+| `POST` | `/Expense/rest/expense/updateExpense` | Modifica puntuale di una spesa esistente. |
+| `DELETE`| `/Expense/rest/expense/deleteExpense` | Cancellazione singola spesa previa verifica di proprietà. |
+| `DELETE`| `/Expense/rest/expense/deleteAllExpenses` | Cancellazione massiva dell'intero storico spese dell'utente. |
+
+*Per gli schemi completi dei payload e codici di risposta, consultare la [Guida API REST](docs/api.md).*
 
 ---
 
-## 🔌 REST API Reference
+## 🚀 Installazione e Avvio Locale
 
-All requests originating from client applications must be sent through the **API Gateway**:
-- **Production Base URL**: `https://khondor03-Spendy.hf.space`
-- **Local Base URL**: `http://localhost:7860` (or `http://localhost:8080`)
-
-### Authentication Endpoints
-
-Base path via Gateway: `/Auth/rest/auth`
-
-#### 1. User Registration
-- **Endpoint**: `POST /Auth/rest/auth/register`
-- **Auth Required**: No
-- **Request Body**:
-  ```json
-  {
-    "username": "john_doe",
-    "password": "SecurePassword123!",
-    "name": "John",
-    "surname": "Doe",
-    "email": "john.doe@example.com"
-  }
-  ```
-- **Responses**:
-  - `200 OK`: `"Registration successful"`
-  - `409 Conflict`: `"User already exists"`
-  - `401 Unauthorized`: `"Email non valida"`
-
-#### 2. User Login
-- **Endpoint**: `POST /Auth/rest/auth/login`
-- **Auth Required**: No
-- **Request Body**: Accepts `username` (or `email`) and `password`:
-  ```json
-  {
-    "username": "john_doe",
-    "password": "SecurePassword123!"
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "accessToken": "eyJhbGciOi...",
-    "refreshToken": "d8b3c9a1-..."
-  }
-  ```
-
-#### 3. Refresh Access Token
-- **Endpoint**: `POST /Auth/rest/auth/refresh`
-- **Auth Required**: No
-- **Request Body**:
-  ```json
-  {
-    "refreshToken": "d8b3c9a1-..."
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "accessToken": "eyJhbGciOi...",
-    "refreshToken": "new_rotated_refresh_token_..."
-  }
-  ```
-
-#### 4. Get User Profile
-- **Endpoint**: `GET /Auth/rest/auth/profile`
-- **Auth Required**: Yes (`Bearer <accessToken>`)
-- **Response**:
-  ```json
-  {
-    "username": "john_doe",
-    "name": "John",
-    "surname": "Doe",
-    "email": "john.doe@example.com"
-  }
-  ```
-
-#### 5. Update Profile
-- **Endpoint**: `PUT /Auth/rest/auth/updateProfile`
-- **Auth Required**: Yes (`Bearer <accessToken>`)
-- **Request Body**: Updated `User` fields.
-
-#### 6. JWKS Public Keys (RFC 7517)
-- **Endpoint**: `GET /Auth/rest/auth/jwks.json`
-- **Auth Required**: No (Public key set for JWT signature verification)
-- **Response**: RFC 7517 standard JWKS with RSA-2048 public key and key ID.
-
----
-
-### Expense Endpoints
-
-Base path via Gateway: `/Expense/rest/expense`  
-*All expense endpoints require the `Authorization: Bearer <accessToken>` header.*
-
-#### 1. Import Statement via CSV
-- **Endpoint**: `POST /Expense/rest/expense/import`
-- **Content-Type**: `multipart/form-data`
-- **Form Data**: `file` (CSV file attachment)
-- **Description**: Parses transactions, auto-detects column order and delimiter, infers category using OpenNLP, and persists expenses.
-
-#### 2. List All Expenses
-- **Endpoint**: `GET /Expense/rest/expense/getExpenses`
-- **Response**:
-  ```json
-  [
-    {
-      "id": "664fa1...",
-      "userId": "john_doe",
-      "description": "Supermercato Conad",
-      "amount": -45.50,
-      "currency": "EUR",
-      "category": "Supermercati e Alimentari",
-      "startedDate": "2026-05-15T12:30:00Z",
-      "completedDate": "2026-05-15T12:30:00Z"
-    }
-  ]
-  ```
-
-#### 3. Filter Expenses by Date Range
-- **Endpoint**: `POST /Expense/rest/expense/getExpenseByDate`
-- **Request Body**:
-  ```json
-  {
-    "startedDate": "2026-05-01T00:00:00.000Z",
-    "completedDate": "2026-05-31T23:59:59.000Z"
-  }
-  ```
-
-#### 4. Filter Expenses by Month and Year
-- **Endpoint**: `POST /Expense/rest/expense/getExpenseByMonth`
-- **Request Body**:
-  ```json
-  {
-    "month": "05",
-    "year": "2026"
-  }
-  ```
-
-#### 5. Monthly Aggregation of Year
-- **Endpoint**: `POST /Expense/rest/expense/getMonthlyAmountOfYear`
-- **Request Body**:
-  ```json
-  {
-    "year": "2026"
-  }
-  ```
-- **Description**: Computes total expenditure summed month-by-month for financial charts.
-
-#### 6. Add Single Expense
-- **Endpoint**: `POST /Expense/rest/expense/addExpense`
-- **Request Body**:
-  ```json
-  {
-    "description": "Pranzo Trattoria",
-    "amount": "-24.00",
-    "currency": "EUR",
-    "type": "CARD_PAYMENT",
-    "product": "Current",
-    "startedDate": "2026-05-20T13:00:00.000Z",
-    "completedDate": "2026-05-20T13:00:00.000Z"
-  }
-  ```
-- **Response**: `201 Created`
-
-#### 7. Update Expense
-- **Endpoint**: `POST /Expense/rest/expense/updateExpense`
-- **Request Body**: Expense payload containing target `expenseId` and modified fields.
-
-#### 8. Delete Single Expense
-- **Endpoint**: `DELETE /Expense/rest/expense/deleteExpense`
-- **Request Body**:
-  ```json
-  {
-    "expenseId": "664fa1..."
-  }
-  ```
-
-#### 9. Delete All Expenses
-- **Endpoint**: `DELETE /Expense/rest/expense/deleteAllExpenses`
-- **Description**: Safely cleans all transaction history belonging to the authenticated user.
-
----
-
-## 🚀 Getting Started & Local Setup
-
-### Prerequisites
-- **JDK 21** installed and configured (`java -version`).
-- **Maven 3.9+** installed (`mvn -version`).
-- **MySQL 8.x** running locally or via Docker (`mysql -u root`).
-
-### 1. Database Initialization
-Before running locally, initialize the two relational schemas (`spendy_auth` and `spendy_expense`) and user permissions:
+### 1. Inizializzazione del Database MySQL
 ```bash
 mysql -u root -p < init-db.sql
 ```
-*Note: Flyway automatically applies versioned DDL migrations (`V1__create_auth_schema.sql` and `V1__create_expense_schema.sql`) when the microservices start up.*
+*Le migrazioni DDL Flyway verranno applicate automaticamente all'avvio dei microservizi.*
 
-### 2. Clone and Build
+### 2. Compilazione
 ```bash
-git clone https://github.com/Giusk10/SpendyApp.git
-cd SpendyApp
 mvn clean install -DskipTests
 ```
 
-### 3. Running the Services Locally
-
-You can launch each service in separate terminal windows:
-
-#### Start AuthMicroService (Port 8081)
+### 3. Avvio Indipendente dei Servizi
+In finestre di terminale separate:
 ```bash
-cd AuthMicroService
-mvn spring-boot:run
+# Avvio AuthMicroService (Porta 8081)
+cd AuthMicroService && mvn spring-boot:run
+
+# Avvio ExpenseMicroService (Porta 8084)
+cd ExpenseMicroService && mvn spring-boot:run
+
+# Avvio Gateway (Porta 7860)
+cd Gateway && mvn spring-boot:run
 ```
 
-#### Start ExpenseMicroService (Port 8084)
-```bash
-cd ExpenseMicroService
-mvn spring-boot:run
-```
-
-#### Start Gateway (Port 7860 / 8080)
-```bash
-cd Gateway
-mvn spring-boot:run
-```
-
-Verify the gateway health by opening:
+Verificare il funzionamento del Gateway:
 ```bash
 curl http://localhost:7860/
-# Returns: 🟢 Spendy Gateway è attivo e funzionante! (V. Finale)
+# Risposta: 🟢 Spendy Gateway è attivo e funzionante! (V. Finale)
 ```
 
 ---
 
-## 🐳 Docker & Containerized Deployment
+## 🐳 Deployment Docker e Containerizzazione
 
-### 1. Multi-Container Orchestration (Docker Compose)
-Run the entire platform including MySQL 8.4, AuthMicroService, ExpenseMicroService, and Gateway with automated health checks:
+### Orchestrazione Multi-Container (Docker Compose)
+Avvia la piattaforma completa (MySQL 8.4 isolato su rete privata, Auth, Expense e Gateway):
 ```bash
 docker compose up --build -d
 ```
-Check service logs and health status:
+Verifica lo stato di salute:
 ```bash
 docker compose ps
-docker compose logs -f gateway-service
 ```
 
-### 2. Standalone All-in-One Container (Hugging Face Spaces)
+### Deployment All-in-One Container (Hugging Face Spaces)
 ```bash
 docker build -t spendy-backend:latest .
-docker run -d \
-  --name spendy-app \
-  -p 7860:7860 \
-  --env-file .env \
-  spendy-backend:latest
+docker run -d -p 7860:7860 --env-file .env spendy-backend:latest
 ```
-
-### Container Architecture Highlights
-- **Multi-Stage Build**: Compiles all three services using `maven:3.9.6-eclipse-temurin-21-alpine` with targetable stages (`auth-service`, `expense-service`, `gateway-service`, and `all-in-one`).
-- **Rootless Execution**: Enforces non-root security (`UID 1000: user`) compliant with strict container sandbox environments.
-- **Readiness Polling**: `entrypoint.sh` starts `auth-service` and `expense-service` and actively polls their `/actuator/health` endpoints before launching `gateway-service`.
 
 ---
 
-## 🧪 Testing & Quality Assurance
+## 🧪 Test e Assicurazione della Qualità
 
-### Unit & Integration Tests
-Run unit tests across all microservices with coverage reporting via **JaCoCo**:
+L'intero codebase è coperto da una suite automatizzata di **170 test** unitari, di sicurezza e di integrazione con persistenza su H2 in-memory:
+
 ```bash
 mvn test
 ```
-JaCoCo reports are generated under:
-`*/target/site/jacoco/index.html`
+
+I report di copertura del codice generati dal plugin **JaCoCo** sono consultabili nei percorsi:
+- `AuthMicroService/target/site/jacoco/index.html` (Copertura: **65.77%**)
+- `ExpenseMicroService/target/site/jacoco/index.html` (Copertura: **63.74%**)
+- `Gateway/target/site/jacoco/index.html` (Copertura: **73.53%**)
+
+*Dettagli approfonditi sono disponibili nella [Guida al Testing](docs/testing.md).*
 
 ---
 
-## 📄 License
+## 📄 Licenza
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPLv3)**.  
-See the [LICENSE](LICENSE) file for full license terms.
+Questo progetto è rilasciato sotto licenza **GNU Affero General Public License v3.0 (AGPLv3)**.  
+Consultare il file [LICENSE](LICENSE) per i termini completi della licenza.
 
-Third-party dependencies and notices are aggregated automatically during the build into `THIRD-PARTY-ALL.txt`.
+I riconoscimenti e le note di licenza delle librerie di terze parti sono aggregati automaticamente nel file [THIRD-PARTY-ALL.txt](THIRD-PARTY-ALL.txt).
