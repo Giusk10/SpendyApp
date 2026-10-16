@@ -43,7 +43,7 @@ Verificare che il file non sia vuoto e che il backup sia conservato in un luogo 
 Con i valori aggiornati in `.env`, eseguire lo script già montato nel container:
 
 ```sh
-docker compose exec mysql sh /docker-entrypoint-initdb.d/02-init-users.sh
+docker compose exec mysql sh /docker-entrypoint-initdb.d/99-init-users.sh
 ```
 
 Lo script valida gli identificatori, non stampa le password e assegna privilegi per schema.
