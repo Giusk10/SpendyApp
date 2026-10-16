@@ -87,11 +87,16 @@ GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES, DROP ON 
 EOSQL
 fi
 
-# Revoca l'account condiviso solo quando entrambi i runtime account dedicati
-# sono configurati. I permessi Flyway sono assegnati agli account migration.
+# Revoca l'account condiviso solo quando esplicitamente richiesto (REVOKE_SHARED_USER=true)
+# e quando entrambi i runtime account dedicati sono configurati.
 if [ -n "${MYSQL_AUTH_USER:-}" ] && [ -n "${MYSQL_EXPENSE_USER:-}" ]; then
-    echo "Revoca privilegi all'account condiviso '${MYSQL_USER:-spendy}'."
-    mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<EOSQL
+    if [ "${REVOKE_SHARED_USER:-false}" = "true" ]; then
+        echo "Revoca privilegi all'account condiviso '${MYSQL_USER:-spendy}'."
+        mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<EOSQL
 REVOKE ALL PRIVILEGES, GRANT OPTION FROM '${MYSQL_USER:-spendy}'@'%';
 EOSQL
+    else
+        echo "Mantenimento dei privilegi per l'account condiviso '${MYSQL_USER:-spendy}' (REVOKE_SHARED_USER non abilitato)."
+    fi
 fi
+
