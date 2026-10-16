@@ -142,4 +142,18 @@ class UserAuthServiceTest {
         service.init();
         assertNotNull(service);
     }
+
+    @Test
+    void testInitAndLoadPublicKeyFromPemSecret() throws Exception {
+        String pubPem = "-----BEGIN PUBLIC KEY-----\n" +
+                java.util.Base64.getEncoder().encodeToString(publicKey.getEncoded()) +
+                "\n-----END PUBLIC KEY-----";
+
+        UserAuthService service = new UserAuthService();
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "publicKeyPem", pubPem);
+        service.init();
+
+        String token = createToken(privateKey, "spendy-auth", "spendy-app", 60000);
+        assertEquals("john_doe", service.getUsernameFromToken(token));
+    }
 }

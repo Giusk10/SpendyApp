@@ -40,6 +40,10 @@ services:
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
       - JWT_EXPIRATION=${JWT_EXPIRATION:-900000}
+      - JWT_PRIVATE_KEY=${JWT_PRIVATE_KEY:-}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
+      - JWT_PRIVATE_KEY_LOCATION=${JWT_PRIVATE_KEY_LOCATION:-}
+      - JWT_PUBLIC_KEY_LOCATION=${JWT_PUBLIC_KEY_LOCATION:-}
       - SERVER_PORT=8081
       - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms128m -Xmx256m}
     depends_on:
@@ -65,6 +69,8 @@ services:
       - MYSQL_DATABASE_EXPENSE=${MYSQL_DATABASE_EXPENSE:-spendy_expense}
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
+      - JWT_PUBLIC_KEY_LOCATION=${JWT_PUBLIC_KEY_LOCATION:-}
       - SERVER_PORT=8084
       - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms256m -Xmx512m}
     depends_on:
@@ -86,6 +92,9 @@ services:
     environment:
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
+      - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
+      - JWT_PUBLIC_KEY_LOCATION=${JWT_PUBLIC_KEY_LOCATION:-}
+      - JWT_JWK_SET_URI=${JWT_JWK_SET_URI:-}
       - AUTH_SERVICE_URI=http://auth-service:8081
       - EXPENSE_SERVICE_URI=http://expense-service:8084
       - SERVER_PORT=7860

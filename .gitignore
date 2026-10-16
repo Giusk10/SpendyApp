@@ -14,3 +14,9 @@
 target/
 **/target/
 /ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/dataset.txt
+
+# Cryptographic Keys and Certificates
+*.pem
+*.key
+*.crt
+**/keys/

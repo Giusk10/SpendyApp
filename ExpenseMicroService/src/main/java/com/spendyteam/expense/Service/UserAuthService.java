@@ -35,8 +35,8 @@ public class UserAuthService {
     @Value("${jwt.audience:spendy-app}")
     private String audience = "spendy-app";
 
-    @Value("${jwt.public-key-location:classpath:keys/public_key.pem}")
-    private String publicKeyLocation = "classpath:keys/public_key.pem";
+    @Value("${jwt.public-key-location:}")
+    private String publicKeyLocation = "";
 
     @Value("${jwt.public-key:}")
     private String publicKeyPem;
@@ -176,7 +176,7 @@ public class UserAuthService {
     private RSAPublicKey loadPublicKey() {
         try {
             String pem = publicKeyPem;
-            if (pem == null || pem.isBlank()) {
+            if ((pem == null || pem.isBlank()) && publicKeyLocation != null && !publicKeyLocation.isBlank()) {
                 if (resourceLoader == null) {
                     return null;
                 }
@@ -188,7 +188,13 @@ public class UserAuthService {
                     pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
                 }
             }
+            if (pem == null || pem.isBlank()) {
+                return null;
+            }
             String clean = pem
+                    .replace("\\n", "")
+                    .replace("-----BEGIN RSA PUBLIC KEY-----", "")
+                    .replace("-----END RSA PUBLIC KEY-----", "")
                     .replace("-----BEGIN PUBLIC KEY-----", "")
                     .replace("-----END PUBLIC KEY-----", "")
                     .replaceAll("\\s+", "");

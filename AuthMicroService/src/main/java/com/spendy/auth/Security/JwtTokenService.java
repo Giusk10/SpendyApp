@@ -19,9 +19,14 @@ import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
@@ -30,6 +35,8 @@ import java.util.*;
 
 @Service
 public class JwtTokenService {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtTokenService.class);
 
     public static final String KEY_ID = "spendy-auth-key-1";
 
@@ -48,11 +55,11 @@ public class JwtTokenService {
     @Value("${jwt.public-key:}")
     private String publicKeyPem;
 
-    @Value("${jwt.private-key-location:classpath:keys/private_key.pem}")
-    private String privateKeyLocation = "classpath:keys/private_key.pem";
+    @Value("${jwt.private-key-location:}")
+    private String privateKeyLocation = "";
 
-    @Value("${jwt.public-key-location:classpath:keys/public_key.pem}")
-    private String publicKeyLocation = "classpath:keys/public_key.pem";
+    @Value("${jwt.public-key-location:}")
+    private String publicKeyLocation = "";
 
     private final ResourceLoader resourceLoader;
 
@@ -197,45 +204,70 @@ public class JwtTokenService {
     private RSAPrivateKey loadPrivateKey() {
         try {
             String pem = privateKeyPem;
-            if (pem == null || pem.isBlank()) {
+            if ((pem == null || pem.isBlank()) && privateKeyLocation != null && !privateKeyLocation.isBlank()) {
                 pem = readResourceContent(privateKeyLocation);
             }
-            byte[] decoded = decodePem(pem, "PRIVATE KEY");
-            PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            return (RSAPrivateKey) kf.generatePrivate(keySpec);
+            if (pem != null && !pem.isBlank()) {
+                byte[] decoded = decodePem(pem, "PRIVATE KEY");
+                PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                return (RSAPrivateKey) kf.generatePrivate(keySpec);
+            }
+
+            log.warn("No RSA private key provided via secrets (jwt.private-key / jwt.private-key-location). Generating ephemeral 2048-bit RSA key pair for local dev/test.");
+            KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+            kpg.initialize(2048);
+            KeyPair kp = kpg.generateKeyPair();
+            this.publicKey = (RSAPublicKey) kp.getPublic();
+            return (RSAPrivateKey) kp.getPrivate();
         } catch (Exception e) {
             throw new IllegalStateException("Unable to load RSA private key: " + e.getMessage(), e);
         }
     }
 
     private RSAPublicKey loadPublicKey() {
+        if (this.publicKey != null) {
+            return this.publicKey;
+        }
         try {
             String pem = publicKeyPem;
-            if (pem == null || pem.isBlank()) {
+            if ((pem == null || pem.isBlank()) && publicKeyLocation != null && !publicKeyLocation.isBlank()) {
                 pem = readResourceContent(publicKeyLocation);
             }
-            byte[] decoded = decodePem(pem, "PUBLIC KEY");
-            X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            return (RSAPublicKey) kf.generatePublic(keySpec);
+            if (pem != null && !pem.isBlank()) {
+                byte[] decoded = decodePem(pem, "PUBLIC KEY");
+                X509EncodedKeySpec keySpec = new X509EncodedKeySpec(decoded);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                return (RSAPublicKey) kf.generatePublic(keySpec);
+            }
+            return null;
         } catch (Exception e) {
             throw new IllegalStateException("Unable to load RSA public key: " + e.getMessage(), e);
         }
     }
 
-    private String readResourceContent(String location) throws Exception {
-        if (resourceLoader == null) {
-            throw new IllegalStateException("ResourceLoader is not available");
+    private String readResourceContent(String location) {
+        if (resourceLoader == null || location == null || location.isBlank()) {
+            return null;
         }
-        Resource resource = resourceLoader.getResource(location);
-        try (InputStream is = resource.getInputStream()) {
-            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        try {
+            Resource resource = resourceLoader.getResource(location);
+            if (!resource.exists()) {
+                return null;
+            }
+            try (InputStream is = resource.getInputStream()) {
+                return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) {
+            return null;
         }
     }
 
     private byte[] decodePem(String pem, String type) {
         String clean = pem
+                .replace("\\n", "")
+                .replace("-----BEGIN RSA " + type + "-----", "")
+                .replace("-----END RSA " + type + "-----", "")
                 .replace("-----BEGIN " + type + "-----", "")
                 .replace("-----END " + type + "-----", "")
                 .replaceAll("\\s+", "");

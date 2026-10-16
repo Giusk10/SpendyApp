@@ -41,10 +41,42 @@ class SecurityConfigTest {
     }
 
     @Test
-    void testReactiveJwtDecoder_CreationFromClasspath() {
+    void testReactiveJwtDecoder_CreationFromPem() throws Exception {
+        java.security.KeyPair kp = java.security.KeyPairGenerator.getInstance("RSA").generateKeyPair();
+        String pem = "-----BEGIN PUBLIC KEY-----\n" +
+                java.util.Base64.getEncoder().encodeToString(kp.getPublic().getEncoded()) +
+                "\n-----END PUBLIC KEY-----";
+
         ReactiveJwtDecoder decoder = securityConfig.reactiveJwtDecoder(
-                "classpath:keys/public_key.pem",
                 "",
+                pem,
+                "spendy-auth",
+                "spendy-app",
+                new DefaultResourceLoader()
+        );
+
+        assertNotNull(decoder);
+    }
+
+    @Test
+    void testReactiveJwtDecoder_EphemeralFallbackWhenNoKeyConfigured() {
+        ReactiveJwtDecoder decoder = securityConfig.reactiveJwtDecoder(
+                "",
+                "",
+                "spendy-auth",
+                "spendy-app",
+                new DefaultResourceLoader()
+        );
+
+        assertNotNull(decoder);
+    }
+
+    @Test
+    void testReactiveJwtDecoder_CreationWithJwkSetUri() {
+        ReactiveJwtDecoder decoder = securityConfig.reactiveJwtDecoder(
+                "",
+                "",
+                "http://localhost:8081/rest/auth/jwks.json",
                 "spendy-auth",
                 "spendy-app",
                 new DefaultResourceLoader()

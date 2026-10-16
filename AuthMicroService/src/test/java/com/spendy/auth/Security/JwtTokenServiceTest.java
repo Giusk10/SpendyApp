@@ -9,6 +9,7 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -136,5 +137,27 @@ class JwtTokenServiceTest {
 
         String token = serviceFromResources.generateToken("resourceUser");
         assertEquals("resourceUser", serviceFromResources.verifyTokenAndGetSubject(token));
+    }
+
+    @Test
+    void testInitFromPemSecrets() throws Exception {
+        KeyPair kp = KeyPairGenerator.getInstance("RSA").generateKeyPair();
+        String privPem = "-----BEGIN PRIVATE KEY-----\n" +
+                Base64.getEncoder().encodeToString(kp.getPrivate().getEncoded()) +
+                "\n-----END PRIVATE KEY-----";
+        String pubPem = "-----BEGIN PUBLIC KEY-----\n" +
+                Base64.getEncoder().encodeToString(kp.getPublic().getEncoded()) +
+                "\n-----END PUBLIC KEY-----";
+
+        JwtTokenService serviceWithPem = new JwtTokenService(new DefaultResourceLoader());
+        org.springframework.test.util.ReflectionTestUtils.setField(serviceWithPem, "privateKeyPem", privPem);
+        org.springframework.test.util.ReflectionTestUtils.setField(serviceWithPem, "publicKeyPem", pubPem);
+        serviceWithPem.init();
+
+        assertNotNull(serviceWithPem.getPublicKey());
+        assertNotNull(serviceWithPem.getPrivateKey());
+
+        String token = serviceWithPem.generateToken("secretUser");
+        assertEquals("secretUser", serviceWithPem.verifyTokenAndGetSubject(token));
     }
 }

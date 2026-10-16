@@ -23,9 +23,13 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.CorsConfigurationSource;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
+import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
@@ -35,6 +39,8 @@ import java.util.List;
 @EnableWebFluxSecurity
 @EnableReactiveMethodSecurity
 public class SecurityConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -53,14 +59,20 @@ public class SecurityConfig {
 
     @Bean
     public ReactiveJwtDecoder reactiveJwtDecoder(
-            @Value("${jwt.public-key-location:classpath:keys/public_key.pem}") String publicKeyLocation,
+            @Value("${jwt.public-key-location:}") String publicKeyLocation,
             @Value("${jwt.public-key:}") String publicKeyPem,
+            @Value("${jwt.jwk-set-uri:}") String jwkSetUri,
             @Value("${jwt.issuer:spendy-auth}") String issuer,
             @Value("${jwt.audience:spendy-app}") String audience,
             ResourceLoader resourceLoader) {
 
-        RSAPublicKey publicKey = loadPublicKey(publicKeyPem, publicKeyLocation, resourceLoader);
-        NimbusReactiveJwtDecoder decoder = NimbusReactiveJwtDecoder.withPublicKey(publicKey).build();
+        NimbusReactiveJwtDecoder decoder;
+        if (jwkSetUri != null && !jwkSetUri.isBlank()) {
+            decoder = NimbusReactiveJwtDecoder.withJwkSetUri(jwkSetUri).build();
+        } else {
+            RSAPublicKey publicKey = loadPublicKey(publicKeyPem, publicKeyLocation, resourceLoader);
+            decoder = NimbusReactiveJwtDecoder.withPublicKey(publicKey).build();
+        }
 
         OAuth2TokenValidator<Jwt> withIssuer = JwtValidators.createDefaultWithIssuer(issuer);
         OAuth2TokenValidator<Jwt> withAudience = new DelegatingOAuth2TokenValidator<>(
@@ -75,6 +87,15 @@ public class SecurityConfig {
                 });
         decoder.setJwtValidator(withAudience);
         return decoder;
+    }
+
+    public ReactiveJwtDecoder reactiveJwtDecoder(
+            String publicKeyLocation,
+            String publicKeyPem,
+            String issuer,
+            String audience,
+            ResourceLoader resourceLoader) {
+        return reactiveJwtDecoder(publicKeyLocation, publicKeyPem, null, issuer, audience, resourceLoader);
     }
 
     @Bean
@@ -118,13 +139,26 @@ public class SecurityConfig {
 
     private RSAPublicKey loadPublicKey(String pem, String location, ResourceLoader resourceLoader) {
         try {
-            if (pem == null || pem.isBlank()) {
-                Resource resource = resourceLoader.getResource(location);
-                try (InputStream is = resource.getInputStream()) {
-                    pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            if ((pem == null || pem.isBlank()) && location != null && !location.isBlank()) {
+                if (resourceLoader != null) {
+                    Resource resource = resourceLoader.getResource(location);
+                    if (resource.exists()) {
+                        try (InputStream is = resource.getInputStream()) {
+                            pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                        }
+                    }
                 }
             }
+            if (pem == null || pem.isBlank()) {
+                log.warn("No RSA public key configured for Gateway via jwt.public-key or jwt.public-key-location. Using an ephemeral RSA public key for local dev startup.");
+                KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+                kpg.initialize(2048);
+                return (RSAPublicKey) kpg.generateKeyPair().getPublic();
+            }
             String clean = pem
+                    .replace("\\n", "")
+                    .replace("-----BEGIN RSA PUBLIC KEY-----", "")
+                    .replace("-----END RSA PUBLIC KEY-----", "")
                     .replace("-----BEGIN PUBLIC KEY-----", "")
                     .replace("-----END PUBLIC KEY-----", "")
                     .replaceAll("\\s+", "");

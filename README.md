@@ -186,10 +186,14 @@ MYSQL_PASSWORD=spendypassword
 MYSQL_DATABASE_AUTH=spendy_auth
 MYSQL_DATABASE_EXPENSE=spendy_expense
 
-# JWT Authentication Config (RS256 Asymmetric)
+# JWT Authentication Config (RS256 Asymmetric Secrets)
 JWT_ISSUER=spendy-auth
 JWT_AUDIENCE=spendy-app
 JWT_EXPIRATION=900000
+# In production, keys are injected via secrets (PEM strings or mounted paths)
+# JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----"
+# JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+# JWT_JWK_SET_URI=http://auth-service:8081/rest/auth/jwks.json
 
 # Microservice Network Routing
 AUTH_SERVICE_URI=http://localhost:8081
@@ -210,6 +214,9 @@ JAVA_TOOL_OPTIONS=-Xms128m -Xmx256m
 | `JWT_ISSUER` | Expected JWT issuer claim (`iss`) | `spendy-auth` |
 | `JWT_AUDIENCE` | Expected JWT audience claim (`aud`) | `spendy-app` |
 | `JWT_EXPIRATION` | Access token lifespan in milliseconds | `900000` (15 minutes) |
+| `JWT_PRIVATE_KEY` | RSA Private Key PEM string (Auth Service secret) | `-----BEGIN PRIVATE KEY-----...` |
+| `JWT_PUBLIC_KEY` | RSA Public Key PEM string (Gateway & Expense secret)| `-----BEGIN PUBLIC KEY-----...` |
+| `JWT_JWK_SET_URI` | Optional JWKS endpoint URL for Gateway dynamic verification | `http://auth-service:8081/rest/auth/jwks.json` |
 | `AUTH_SERVICE_URI` | Destination URL for Auth Microservice | `http://localhost:8081` |
 | `EXPENSE_SERVICE_URI`| Destination URL for Expense Microservice | `http://localhost:8084` |
 
