@@ -60,6 +60,11 @@ class GatewaySecurityTest {
         public Mono<String> unmappedAuth() {
             return Mono.just("Unmapped Auth Endpoint");
         }
+
+        @GetMapping("/actuator/health")
+        public Mono<String> actuatorHealth() {
+            return Mono.just("{\"status\":\"UP\"}");
+        }
     }
 
     @BeforeEach
@@ -242,6 +247,13 @@ class GatewaySecurityTest {
                 .header("Authorization", "Bearer " + hmacToken)
                 .exchange()
                 .expectStatus().isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void testActuatorHealth_PermitAll() {
+        webTestClient.get().uri("/actuator/health")
+                .exchange()
+                .expectStatus().isOk();
     }
 }
 

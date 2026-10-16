@@ -16,7 +16,7 @@ flowchart TD
     end
 
     subgraph EdgeTier ["Edge & Ingress Layer"]
-        Gateway["Spring Cloud Gateway<br/>(Porta: 7860 / 8080)<br/>- Spring WebFlux & Reactor Netty<br/>- Virtual Threads (Java 21)<br/>- Decodifica & Validazione JWT RS256<br/>- Deduplica Header CORS<br/>- Rimozione Header Spoofing (X-Auth-User)"]
+        Gateway["Spring Cloud Gateway<br/>(Porta Ingress: 7860)<br/>- Spring WebFlux & Reactor Netty<br/>- Virtual Threads (Java 21)<br/>- Decodifica & Validazione JWT RS256<br/>- Deduplica Header CORS<br/>- Rimozione Header Spoofing (X-Auth-User)"]
     end
 
     subgraph ServiceTier ["Microservices Layer (Rete Privata)"]
@@ -50,7 +50,7 @@ Il repository è strutturato come un progetto multi-modulo Apache Maven coordina
 - **Classe di avvio**: [GatewayApplication.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/main/java/com/spendy/gateway/GatewayApplication.java)
 - **Configurazione di sicurezza**: [SecurityConfig.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/main/java/com/spendy/gateway/JWT/SecurityConfig.java)
 - **Tecnologie**: Spring Cloud Gateway Server WebFlux, Reactor Netty, Spring Security Reactive OAuth2 Resource Server.
-- **Porta predefinita**: `7860` (ambiente produzione / Hugging Face Spaces) o `8080` (sviluppo locale).
+- **Porta predefinita**: `7860` (ambiente produzione / Hugging Face Spaces e sviluppo locale; rimappabile sull'host tramite `GATEWAY_PORT`).
 - **Responsabilità**:
   1. *Routing dinamico e path rewrite*: Reindirizza le richieste `/Auth/**` verso `AuthMicroService` (riscrivendo in `/${segment}`) e `/Expense/**` verso `ExpenseMicroService` (riscrivendo in `/${segment}`).
   2. *Autenticazione perimetrale OAuth2/JWT*: Valida localmente i token JWT Bearer in ingresso verificando crittograficamente la firma RSA (RS256) tramite chiave pubblica o endpoint JWKS RFC 7517.
@@ -186,7 +186,7 @@ sequenceDiagram
 ## 6. Limiti e Punti di Attenzione Architetturali
 
 1. **Deployment All-in-One vs Distribuito**:
-   - In ambienti come Hugging Face Spaces, l'intero ecosistema (Gateway, Auth, Expense) gira all'interno di un unico container Docker orchestrato tramite [entrypoint.sh](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/entrypoint.sh). Questa configurazione richiede allocazioni di memoria controllate via `JAVA_TOOL_OPTIONS` e `Xmx` per evitare errori OutOfMemory.
+   - In ambienti come Hugging Face Spaces, l'intero ecosistema (Gateway, Auth, Expense) gira all'interno di un unico container Docker orchestrato tramite [entrypoint.sh](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/deploy/huggingface/entrypoint.sh). Questa configurazione richiede allocazioni di memoria controllate via `JAVA_TOOL_OPTIONS` e `Xmx` per evitare errori OutOfMemory.
 2. **Assenza di Message Broker esterno**:
    - Attualmente non vi è un broker di messaggi distribuito (Kafka o RabbitMQ). Le comunicazioni e le reazioni tra domini sono disaccoppiate via token crittografici stateless (Zero-Trust).
 3. **Distribuzione Chiavi Crittografiche**:

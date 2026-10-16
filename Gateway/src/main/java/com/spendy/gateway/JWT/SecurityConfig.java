@@ -151,7 +151,8 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/", "/swagger-ui/**", "/swagger-ui.html",
+                        .pathMatchers(HttpMethod.GET, "/", "/actuator/health", "/actuator/health/**",
+                                "/swagger-ui/**", "/swagger-ui.html",
                                 "/v3/api-docs", "/v3/api-docs/**",
                                 "/webjars/**", "/favicon.ico")
                         .permitAll()

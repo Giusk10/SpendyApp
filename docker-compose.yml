@@ -1,21 +1,23 @@
 services:
-  # --- MYSQL DATABASE SERVICE ---
+  # ==============================================================================
+  # 1. MYSQL DATABASE SERVICE
+  # ==============================================================================
   mysql:
     image: mysql:8.4
     container_name: spendy-mysql
     restart: unless-stopped
-    # Database port is isolated within private Docker network and not exposed to host
+    # Database isolato nella rete privata interna Docker
     expose:
       - "3306"
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-spendy_root_secret_change_in_prod}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be configured in .env}
       MYSQL_USER: ${MYSQL_USER:-spendy}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-spendy_user_secret_change_in_prod}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be configured in .env}
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./db/init/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$${MYSQL_ROOT_PASSWORD:-spendy_root_secret_change_in_prod}"]
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -23,21 +25,22 @@ services:
     networks:
       - spendy-network
 
-  # --- AUTH SERVICE ---
+  # ==============================================================================
+  # 2. AUTH SERVICE
+  # ==============================================================================
   auth-service:
     build:
       context: .
       target: auth-service
     container_name: auth-service
     restart: unless-stopped
-    # Isolated within private Docker network; traffic must traverse the Gateway
     expose:
       - "8081"
     environment:
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
       - MYSQL_USER=${MYSQL_USER:-spendy}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-spendy_user_secret_change_in_prod}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE_AUTH=${MYSQL_DATABASE_AUTH:-spendy_auth}
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
@@ -47,56 +50,69 @@ services:
       - JWT_PRIVATE_KEY_LOCATION=${JWT_PRIVATE_KEY_LOCATION:-}
       - JWT_PUBLIC_KEY_LOCATION=${JWT_PUBLIC_KEY_LOCATION:-}
       - JWT_ALLOW_EPHEMERAL_KEYS=${JWT_ALLOW_EPHEMERAL_KEYS:-false}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080,http://localhost:7860,http://127.0.0.1:7860,http://127.0.0.1:8080,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081,http://localhost:8084,http://127.0.0.1:8084}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:7860,http://127.0.0.1:7860,http://localhost:8080,http://127.0.0.1:8080}
       - SERVER_PORT=8081
       - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms128m -Xmx256m}
     depends_on:
       mysql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8081/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 25s
     networks:
       - spendy-network
 
-  # --- EXPENSE SERVICE ---
+  # ==============================================================================
+  # 3. EXPENSE SERVICE
+  # ==============================================================================
   expense-service:
     build:
       context: .
       target: expense-service
     container_name: expense-service
     restart: unless-stopped
-    # Isolated within private Docker network; traffic must traverse the Gateway
     expose:
       - "8084"
     environment:
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
       - MYSQL_USER=${MYSQL_USER:-spendy}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-spendy_user_secret_change_in_prod}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE_EXPENSE=${MYSQL_DATABASE_EXPENSE:-spendy_expense}
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
       - JWT_PUBLIC_KEY=${JWT_PUBLIC_KEY:-}
       - JWT_PUBLIC_KEY_LOCATION=${JWT_PUBLIC_KEY_LOCATION:-}
       - JWT_ALLOW_EPHEMERAL_KEYS=${JWT_ALLOW_EPHEMERAL_KEYS:-false}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080,http://localhost:7860,http://127.0.0.1:7860,http://127.0.0.1:8080,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081,http://localhost:8084,http://127.0.0.1:8084}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:7860,http://127.0.0.1:7860,http://localhost:8080,http://127.0.0.1:8080}
       - SERVER_PORT=8084
       - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms256m -Xmx512m}
     depends_on:
       mysql:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8084/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     networks:
       - spendy-network
 
-  # --- GATEWAY SERVICE ---
+  # ==============================================================================
+  # 4. GATEWAY SERVICE (Unico servizio con porta esposta all'host)
+  # ==============================================================================
   gateway-service:
     build:
       context: .
       target: gateway-service
     container_name: gateway-service
     restart: unless-stopped
-    # Only Gateway ports are exposed to host
     ports:
-      - "7860:7860"
-      - "8080:8080"
+      - "${GATEWAY_PORT:-7860}:7860"
     environment:
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
@@ -104,21 +120,30 @@ services:
       - JWT_PUBLIC_KEY_LOCATION=${JWT_PUBLIC_KEY_LOCATION:-}
       - JWT_JWK_SET_URI=${JWT_JWK_SET_URI:-}
       - JWT_ALLOW_EPHEMERAL_KEYS=${JWT_ALLOW_EPHEMERAL_KEYS:-false}
-      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:8080,http://localhost:7860,http://127.0.0.1:7860,http://127.0.0.1:8080,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081,http://localhost:8084,http://127.0.0.1:8084}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:7860,http://127.0.0.1:7860,http://localhost:8080,http://127.0.0.1:8080}
       - AUTH_SERVICE_URI=http://auth-service:8081
       - EXPENSE_SERVICE_URI=http://expense-service:8084
       - SERVER_PORT=7860
       - JAVA_TOOL_OPTIONS=${JAVA_TOOL_OPTIONS:--Xms128m -Xmx256m}
     depends_on:
-      - auth-service
-      - expense-service
+      auth-service:
+        condition: service_healthy
+      expense-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:7860/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     networks:
       - spendy-network
 
 volumes:
   mysql-data:
-    driver: local
+    name: spendy-mysql-data
 
 networks:
   spendy-network:
+    name: spendy-network
     driver: bridge

@@ -1,0 +1,92 @@
+name: CD - Deploy to Hugging Face Spaces
+
+"on":
+  workflow_run:
+    workflows: ["CI - Build, Test and Verify"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      force_push:
+        description: "Abilita git push --force verso Hugging Face (usare con cautela)"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: deploy-huggingface
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy All-in-One Space
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+
+      - name: Validate Deployment Secrets
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          SPACE_NAME: ${{ secrets.SPACE_NAME }}
+        run: |
+          MISSING=0
+          if [ -z "$HF_TOKEN" ]; then
+            echo "❌ Errore: GitHub Secret 'HF_TOKEN' non è configurato!"
+            MISSING=1
+          fi
+          if [ -z "$HF_USERNAME" ]; then
+            echo "❌ Errore: GitHub Secret o Variabile 'HF_USERNAME' non è configurato!"
+            MISSING=1
+          fi
+          if [ -z "$SPACE_NAME" ]; then
+            echo "❌ Errore: GitHub Secret o Variabile 'SPACE_NAME' non è configurato!"
+            MISSING=1
+          fi
+          if [ "$MISSING" -eq 1 ]; then
+            echo "ℹ️  Configurare i secret mancanti in Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "✅ Tutti i secret necessari per Hugging Face Spaces sono presenti."
+
+      - name: Push to Hugging Face Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          SPACE_NAME: ${{ secrets.SPACE_NAME }}
+          FORCE_PUSH: ${{ github.event.inputs.force_push || 'false' }}
+        run: |
+          echo "🚀 Configurazione remote per lo Space: $HF_USERNAME/$SPACE_NAME"
+          
+          # Configura credenziali in modo sicuro senza mostrare il token nei log
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions CI/CD"
+          
+          # Maschera il token di autenticazione nei log di GitHub Actions
+          echo "::add-mask::$HF_TOKEN"
+          
+          HF_REPO_URL="https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
+          git remote add space "$HF_REPO_URL"
+
+          echo "📦 Sincronizzazione commit verso Hugging Face Space..."
+          if [ "$FORCE_PUSH" = "true" ]; then
+            echo "⚠️ Esecuzione push forzato (--force)..."
+            git push --force space HEAD:refs/heads/main
+          else
+            # Tenta prima un push ordinario
+            if ! git push space HEAD:refs/heads/main; then
+              echo "⚠️ Push ordinario fallito (probabile divergenza remota dei metadati README.md dello Space)."
+              echo "Tento la sincronizzazione con fast-forward/rebase..."
+              git fetch space main
+              git push --force-with-lease space HEAD:refs/heads/main || git push --force space HEAD:refs/heads/main
+            fi
+          fi
+
+          echo "✅ Codice sincronizzato con successo su Hugging Face Spaces!"
+          echo "   URL dello Space: https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"

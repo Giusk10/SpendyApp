@@ -54,12 +54,16 @@ La documentazione approfondita dell'intero sistema è consultabile nella directo
 | Documento | Descrizione |
 | :--- | :--- |
 | 🏛️ [Architettura del Sistema](docs/architecture.md) | Stile architetturale, componenti, flussi sincroni/asincroni, confini dati e diagrammi Mermaid. |
+| ⚙️ [Configurazione & Variabili](docs/configuration.md) | Elenco completo variabili d'ambiente, differenze tra dev e prod, gestione segreti e fail-fast. |
+| 🗄️ [Database & Migrazioni](docs/database.md) | Schemi `spendy_auth`/`spendy_expense`, inizializzazione `init-db.sql`, Flyway, backup e restore. |
+| 💻 [Guida allo Sviluppo](docs/development.md) | Setup ambiente locale, struttura directory, comandi Maven reactor e script di gestione. |
+| 🚀 [Deployment & CI/CD](docs/deployment.md) | Pipeline GitHub Actions separate (CI & CD), Hugging Face Spaces, Docker Compose e rollback. |
+| 🩺 [Operazioni & Monitoraggio](docs/operations.md) | Livelli di health check, smoke test, ispezione dei log e manutenzione ordinaria. |
+| 🔧 [Risoluzione Problemi (Troubleshooting)](docs/troubleshooting.md) | Diagnostica problemi comuni, cause probabili e comandi di risoluzione. |
 | 🔌 [Specifiche API REST](docs/api.md) | Contratti di tutti gli endpoint, metodi HTTP, parametri, schemi di risposta ed esempi JSON. |
 | 🔐 [Autenticazione & Sessioni](docs/authentication.md) | Crittografia asimmetrica RS256, BCrypt, Refresh Token Rotation, hashing SHA-256 e rate limiting. |
-| 🗄️ [Modello Dati & Persistenza](docs/data-model.md) | Schemi relazionali `spendy_auth` e `spendy_expense`, diagramma ER, indici e migrazioni Flyway. |
-| 💻 [Guida allo Sviluppo](docs/development.md) | Setup ambiente locale, struttura directory, convenzioni di codice, Virtual Threads e git workflow. |
-| 🐳 [Deployment & Operazioni](docs/deployment.md) | Orchestrazione Docker Compose, container All-in-One per Hugging Face Spaces e monitoraggio. |
-| 🧪 [Strategia di Test & JaCoCo](docs/testing.md) | Suite di 170 test unitari, integration test con database H2 in memoria e metriche di code coverage. |
+| 🗃️ [Modello Dati & Persistenza](docs/data-model.md) | Schemi relazionali, diagramma ER, indici e vincoli di integrità. |
+| 🧪 [Strategia di Test & JaCoCo](docs/testing.md) | Suite di oltre 170 test, integration test con database H2 in memoria e metriche JaCoCo. |
 | 🛡️ [Analisi di Sicurezza & Threat Model](docs/security.md) | Superfici d'attacco, mitigazione timing attack, protezione IDOR, CORS e gestione segreti. |
 | 📜 [Architecture Decision Records (ADR)](docs/decisions/0001-migrazione-mysql-flyway.md) | Decisioni architetturali motivate (MySQL, RSA RS256, Gateway reattivo, OpenNLP, Token Rotation). |
 | 📋 [Changelog Completo](CHANGELOG.md) | Cronologia ufficiale dei rilasci e commit significativi ricostruita dalla storia Git. |
@@ -255,72 +259,57 @@ Tutte le chiamate dall'esterno devono essere inviate verso l'**API Gateway**:
 
 ---
 
-## 🚀 Installazione e Avvio Locale
+## 🚀 Avvio Rapido e Comandi di Sviluppo
 
-### 1. Inizializzazione del Database MySQL
+### Prerequisiti
+- **Docker & Docker Compose** (raccomandato per avviare l'intero stack isolato)
+- **Java 21 LTS** & **Maven 3.9+** (per compilazione locale e test)
+
+### 1. Avvio dell'Ambiente Locale
+Per preparare le variabili d'ambiente, generare le chiavi RSA locali, avviare MySQL e tutti i microservizi con health check:
 ```bash
-mysql -u root -p < init-db.sql
+./scripts/dev-up.sh
 ```
-*Le migrazioni DDL Flyway verranno applicate automaticamente all'avvio dei microservizi.*
+L'applicazione è operativa su **`http://localhost:7860`** (Swagger UI aggregata: `http://localhost:7860/swagger-ui.html`).
 
-### 2. Compilazione
+### 2. Esecuzione Smoke Test
+Per verificare che tutti gli endpoint chiave, il routing e le policy di sicurezza rispondano correttamente:
 ```bash
-mvn clean install -DskipTests
-```
-
-### 3. Avvio Indipendente dei Servizi
-In finestre di terminale separate:
-```bash
-# Avvio AuthMicroService (Porta 8081)
-cd AuthMicroService && mvn spring-boot:run
-
-# Avvio ExpenseMicroService (Porta 8084)
-cd ExpenseMicroService && mvn spring-boot:run
-
-# Avvio Gateway (Porta 7860)
-cd Gateway && mvn spring-boot:run
+./scripts/smoke-test.sh
 ```
 
-Verificare il funzionamento del Gateway:
+### 3. Consultazione dei Log
 ```bash
-curl http://localhost:7860/
-# Risposta: 🟢 Spendy Gateway è attivo e funzionante! (V. Finale)
+./scripts/dev-logs.sh               # Tutti i servizi in streaming
+./scripts/dev-logs.sh gateway-service # Solo API Gateway
 ```
 
----
-
-## 🐳 Deployment Docker e Containerizzazione
-
-### Orchestrazione Multi-Container (Docker Compose)
-Avvia la piattaforma completa (MySQL 8.4 isolato su rete privata, Auth, Expense e Gateway):
+### 4. Arresto dell'Ambiente Locale
+Per arrestare i servizi preservando i dati nel volume MySQL:
 ```bash
-docker compose up --build -d
-```
-Verifica lo stato di salute:
-```bash
-docker compose ps
-```
-
-### Deployment All-in-One Container (Hugging Face Spaces)
-```bash
-docker build -t spendy-backend:latest .
-docker run -d -p 7860:7860 --env-file .env spendy-backend:latest
+./scripts/dev-down.sh
 ```
 
 ---
 
-## 🧪 Test e Assicurazione della Qualità
+## 🧪 Esecuzione dei Test e Build Maven
 
-L'intero codebase è coperto da una suite automatizzata di **170 test** unitari, di sicurezza e di integrazione con persistenza su H2 in-memory:
+La suite comprende oltre **170 test** automatizzati unitari e di integrazione (con database H2 in memoria):
 
 ```bash
-mvn test
+# Esecuzione di tutti i test
+mvn clean test
+
+# Verifica completa con controllo soglia JaCoCo e generazione report
+mvn clean verify
 ```
 
-I report di copertura del codice generati dal plugin **JaCoCo** sono consultabili nei percorsi:
-- `AuthMicroService/target/site/jacoco/index.html` (Copertura: **65.77%**)
-- `ExpenseMicroService/target/site/jacoco/index.html` (Copertura: **63.74%**)
-- `Gateway/target/site/jacoco/index.html` (Copertura: **73.53%**)
+I report di copertura del codice JaCoCo vengono generati nei percorsi:
+- `AuthMicroService/target/site/jacoco/index.html`
+- `ExpenseMicroService/target/site/jacoco/index.html`
+- `Gateway/target/site/jacoco/index.html`
+
+Per la guida completa e il flusso di contribuzione, consultare la [Guida allo Sviluppo](docs/development.md) e la [Guida al Deployment](docs/deployment.md).
 
 *Dettagli approfonditi sono disponibili nella [Guida al Testing](docs/testing.md).*
 

@@ -1,0 +1,37 @@
+# Git and VCS
+.git/
+.gitignore
+
+# IDE & Editor files
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# Sensitive configuration and secrets
+.env
+*.env
+.env.*
+!/.env.example
+keys/
+**/keys/
+*.pem
+*.key
+*.crt
+
+# Build artifacts & caches
+target/
+**/target/
+.mvn/
+.gradle/
+*.class
+
+# Documentation & scripts not needed in container build
+docs/
+scripts/
+*.log
+
+# OS temporary files
+.DS_Store
+Thumbs.db

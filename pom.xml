@@ -140,7 +140,7 @@
                                 <goal>report</goal>
                             </goals>
                         </execution>
-                        <!-- Check della coverage (opzionale) -->
+                        <!-- Check della coverage: soglia realistica a livello BUNDLE per prevenire regressioni -->
                         <execution>
                             <id>jacoco-check</id>
                             <goals>
@@ -149,12 +149,12 @@
                             <configuration>
                                 <rules>
                                     <rule>
-                                        <element>PACKAGE</element>
+                                        <element>BUNDLE</element>
                                         <limits>
                                             <limit>
                                                 <counter>LINE</counter>
                                                 <value>COVEREDRATIO</value>
-                                                <minimum>0.0</minimum>
+                                                <minimum>0.35</minimum>
                                             </limit>
                                         </limits>
                                     </rule>

@@ -1,6 +1,6 @@
 # Guida allo Sviluppo e Contribuzione
 
-Guida operativa per sviluppatori e manutentori di **SpendyApp**, contenente le istruzioni per configurare l'ambiente locale, le convenzioni di codice, le procedure di build e test e il flusso standard per introdurre nuove funzionalità.
+Guida operativa per sviluppatori e manutentori di **SpendyApp**, contenente le istruzioni per configurare l'ambiente locale, eseguire build e test con Maven, gestire i container Docker tramite gli script dedicati e consultare i log.
 
 ---
 
@@ -10,11 +10,11 @@ Per sviluppare ed eseguire i microservizi di SpendyApp in locale sono necessari 
 
 | Strumento | Versione Minima Richiesta | Comando di Verifica | Scopo |
 | :--- | :--- | :--- | :--- |
-| **Java Development Kit (JDK)** | **Java 21 LTS** (Eclipse Temurin o OpenJDK) | `java -version` | Compilazione con Project Loom (Virtual Threads) |
+| **Java Development Kit (JDK)** | **Java 21 LTS** (Eclipse Temurin o OpenJDK) | `java -version` | Compilazione con Virtual Threads (Project Loom) |
 | **Apache Maven** | **3.9.x** o superiore | `mvn -version` | Gestione build e dipendenze multi-modulo |
-| **MySQL Server** | **8.0** o **8.4 LTS** | `mysql --version` | Database relazionale locale (oppure via Docker) |
-| **Docker & Docker Compose** | Versione recente compatibile con Compose V2 | `docker compose version` | Containerizzazione e database di supporto |
+| **Docker & Docker Compose** | Versione recente con supporto Compose V2 | `docker compose version` | Orchestrazione container locale (MySQL e servizi) |
 | **OpenSSL** | 1.1.1 o 3.x | `openssl version` | Generazione facoltativa chiavi RSA in locale |
+| **cURL** | Qualsiasi versione standard | `curl --version` | Esecuzione dello smoke test end-to-end |
 
 ---
 
@@ -22,178 +22,123 @@ Per sviluppare ed eseguire i microservizi di SpendyApp in locale sono necessari 
 
 ```text
 SpendyApp/
-├── .env.example                                      # Modello delle variabili d'ambiente
-├── .gitignore                                        # File e pattern esclusi da git
+├── .env.example                                      # Modello documentato delle variabili d'ambiente
+├── .gitignore                                        # File e cartelle esclusi dal controllo di versione
+├── .dockerignore                                     # Esclusione secret e artefatti locali dalle immagini Docker
 ├── Dockerfile                                        # Build multi-stage OCI (auth, expense, gateway, all-in-one)
+├── docker-compose.yml                                # Orchestrazione locale multi-container con healthcheck
+├── pom.xml                                           # POM Maven padre (Reactor & Dependency Management)
+├── README.md                                         # Documentazione e punto di ingresso rapido
 ├── LICENSE                                           # Licenza GNU AGPLv3
-├── README.md                                         # Documentazione generale di progetto
-├── THIRD-PARTY-ALL.txt                               # Riconoscimento licenze dipendenze di terze parti
-├── docker-compose.yml                                # Orchestrazione completa locale con MySQL 8.4
-├── entrypoint.sh                                     # Script di avvio All-in-One con readiness polling
-├── init-db.sql                                       # Script DDL per creazione database spendy_auth e spendy_expense
-├── keys/                                             # Directory per chiavi RSA generate per ambiente dev
-├── pom.xml                                           # POM Maven padre per dependency management
+├── THIRD-PARTY-ALL.txt                               # Licenze delle dipendenze di terze parti
 ├── .github/
 │   └── workflows/
-│       └── continuous_integration_ and _deployment.yml # Pipeline CI/CD GitHub Actions
-├── AuthMicroService/                                 # Microservizio di Autenticazione e Identity
-│   ├── pom.xml
-│   └── src/
-│       ├── main/java/com/spendy/auth/
-│       │   ├── Config/                               # Cors, SecurityConfig, OpenApiConfig
-│       │   ├── Controller/                           # AuthController (JAX-RS + Spring MVC)
-│       │   ├── DTO/                                  # Oggetti di trasporto richiesta/risposta
-│       │   ├── Data/                                 # Entità JPA (User, RefreshToken)
-│       │   ├── Repository/                           # Spring Data JPA (IUserRepository, IRefreshTokenRepository)
-│       │   ├── Security/                             # JwtTokenService, RateLimitingFilter, JwtAuthenticationFilter
-│       │   └── Service/                              # AuthService
-│       └── main/resources/
-│           ├── application.properties
-│           └── db/migration/                         # Script Flyway V1, V2, V3
-├── ExpenseMicroService/                              # Microservizio Gestione Spese ed AI
-│   ├── pom.xml
-│   └── src/
-│       ├── main/java/com/spendyteam/expense/
-│       │   ├── Config/                               # Cors, SecurityConfig, OpenApiConfig, WebClientConfig
-│       │   ├── Controller/                           # ExpenseController
-│       │   ├── DTO/                                  # DateFilterRequest, ExpenseCreateRequest, ecc.
-│       │   ├── Data/                                 # Entità JPA (Expense)
-│       │   ├── Repository/                           # IExpenseRepository
-│       │   ├── Security/                             # JwtAuthenticationFilter
-│       │   ├── Service/                              # ExpenseService, ExpenseCsvParser, ExpenseBatchWriter, ...
-│       │   ├── Training/                             # ExpenseModelTrainer, dataset.txt
-│       │   └── Utility/                              # ExpenseClassifier, ExpenseDataParser, ecc.
-│       └── main/resources/
-│           ├── application.properties
-│           ├── expense-model.bin                     # Modello binario addestrato OpenNLP
-│           └── db/migration/                         # Script Flyway V1
-└── Gateway/                                          # API Gateway Reattivo
-    ├── pom.xml
-    └── src/
-        ├── main/java/com/spendy/gateway/
-        │   ├── Config/                               # OpenApiConfig
-        │   ├── JWT/                                  # SecurityConfig (Reactive WebFlux OAuth2)
-        │   └── GatewayApplication.java               # Classe principale di avvio e endpoint "/"
-        └── main/resources/
-            └── application.properties                # Regole di routing, path rewriting e CORS
+│       ├── ci.yml                                    # Pipeline CI (Build, Test, Surefire & JaCoCo Artifacts)
+│       └── deploy-huggingface.yml                    # Pipeline CD (Deploy All-in-One su Hugging Face Spaces)
+├── db/
+│   └── init/
+│       └── init-db.sql                               # Inizializzazione schemi MySQL e privilegi utente
+├── deploy/
+│   └── huggingface/
+│       ├── entrypoint.sh                             # Script di avvio All-in-One supervisionato
+│       └── README.md                                 # Specifiche architetturali dello Space Hugging Face
+├── scripts/
+│   ├── dev-up.sh                                     # Avvio automatico dell'ambiente locale con healthcheck
+│   ├── dev-down.sh                                   # Arresto dei container preservando i volumi dati
+│   ├── dev-logs.sh                                   # Stream in tempo reale dei log dei container
+│   └── smoke-test.sh                                 # Smoke test automatizzato degli endpoint
+├── docs/                                             # Documentazione tecnica di dettaglio
+│   ├── architecture.md                               # Architettura dei microservizi, routing e porte
+│   ├── configuration.md                              # Guida completa alle variabili d'ambiente
+│   ├── database.md                                   # Schema, Flyway, persistenza e backup
+│   ├── deployment.md                                 # Guida CI/CD, Docker Compose e HF Spaces
+│   ├── development.md                                # Setup ambiente locale, comandi Maven e script
+│   ├── operations.md                                 # Monitoraggio, livelli di salute e manutenzione
+│   └── troubleshooting.md                            # Diagnostica problemi comuni e risoluzioni
+├── AuthMicroService/                                 # Microservizio Identity e Autenticazione (Porta 8081)
+├── ExpenseMicroService/                              # Microservizio Gestione Spese e NLP (Porta 8084)
+└── Gateway/                                          # Spring Cloud Gateway Reattivo Ingress (Porta 7860)
 ```
 
 ---
 
-## 3. Configurazione dell'Ambiente Locale
+## 3. Avvio Rapido dell'Ambiente Locale
 
-### 3.1. Predisposizione del Database MySQL
-Se si dispone di MySQL locale o si intende avviarlo tramite Docker:
-```bash
-# Avviare solo il container MySQL tramite Docker Compose:
-docker compose up -d mysql
+### 3.1. Avvio con Script Automatico (Consigliato)
+Lo script [`./scripts/dev-up.sh`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/scripts/dev-up.sh) si occupa di verificare i prerequisiti, inizializzare il file `.env`, generare le chiavi RSA in `keys/` se assenti, compilare e avviare i container, e attendere che il Gateway sia in stato `healthy`:
 
-# Verificare che il container sia in stato healthy:
-docker compose ps mysql
-```
-In alternativa, per un server MySQL nativo:
 ```bash
-mysql -u root -p < init-db.sql
+./scripts/dev-up.sh
 ```
 
-### 3.2. Configurazione del File `.env`
-Copiare il file template [.env.example](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/.env.example) in `.env`:
+Al termine dell'avvio, l'applicazione è accessibile a:
+- **API Gateway**: `http://localhost:7860`
+- **Swagger UI**: `http://localhost:7860/swagger-ui.html`
+- **Gateway Health**: `http://localhost:7860/actuator/health`
+- **Auth Health**: `http://localhost:7860/Auth/rest/auth/health`
+
+### 3.2. Verifica con Smoke Test
+Per confermare che tutti i microservizi, il database e i filtri di sicurezza siano operativi:
+
 ```bash
-cp .env.example .env
+./scripts/smoke-test.sh
 ```
-In ambiente di sviluppo locale, è sufficiente mantenere:
-```env
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=spendy
-MYSQL_PASSWORD=spendy_user_secret_change_in_prod
-MYSQL_DATABASE_AUTH=spendy_auth
-MYSQL_DATABASE_EXPENSE=spendy_expense
-JWT_ALLOW_EPHEMERAL_KEYS=true
-RATE_LIMITING_ENABLED=true
+
+### 3.3. Consultazione dei Log
+Per visualizzare i log in tempo reale:
+
+```bash
+# Tutti i servizi
+./scripts/dev-logs.sh
+
+# Solo un servizio specifico
+./scripts/dev-logs.sh gateway-service
+```
+
+### 3.4. Arresto dell'Ambiente Locale
+Per arrestare i servizi preservando i dati nel volume MySQL:
+
+```bash
+./scripts/dev-down.sh
 ```
 
 ---
 
-## 4. Procedure di Build e Avvio
+## 4. Compilazione, Test e Build con Maven
 
-### 4.1. Compilazione Completa con Maven
-Per compilare l'intero progetto multi-modulo e generare i file di licenza:
+SpendyApp sfrutta il reactor del POM padre. Tutti i comandi possono essere eseguiti direttamente dalla radice del repository:
+
+### 4.1. Compilazione
 ```bash
-mvn clean install -DskipTests
+mvn clean compile
 ```
 
-### 4.2. Esecuzione dei Test
-Per eseguire la suite completa di 170 unit test e integration test con misurazione della copertura **JaCoCo**:
+### 4.2. Esecuzione Test Unitari e di Integrazione
 ```bash
-mvn test
+# Esegue tutti i 170+ test del progetto
+mvn clean test
+
+# Esegue i test di un singolo microservizio
+mvn test -pl AuthMicroService
+mvn test -pl ExpenseMicroService
+mvn test -pl Gateway
 ```
-I report HTML JaCoCo vengono generati nei percorsi:
+
+### 4.3. Verifica Completa e Generazione Report Coverage (JaCoCo)
+```bash
+# Esegue test, report Surefire e verifica della soglia JaCoCo (minimo 35% a livello BUNDLE)
+mvn clean verify
+```
+I report HTML di JaCoCo vengono generati in:
 - `AuthMicroService/target/site/jacoco/index.html`
 - `ExpenseMicroService/target/site/jacoco/index.html`
 - `Gateway/target/site/jacoco/index.html`
 
-### 4.3. Avvio Indipendente dei Microservizi (Terminale Multiplo)
-In tre finestre di terminale separate:
-
+### 4.4. Creazione Pacchetti JAR
 ```bash
-# Finestra 1: Auth Microservice (Porta 8081)
-cd AuthMicroService
-mvn spring-boot:run
-
-# Finestra 2: Expense Microservice (Porta 8084)
-cd ExpenseMicroService
-mvn spring-boot:run
-
-# Finestra 3: API Gateway (Porta 7860)
-cd Gateway
-mvn spring-boot:run
+mvn clean package -DskipTests
 ```
-
----
-
-## 5. Come Introdurre una Nuova Funzionalità (Workflow Standard)
-
-Quando si implementa una nuova funzionalità o si estende il dominio dell'applicazione, seguire rigorosamente questi passaggi:
-
-```mermaid
-flowchart LR
-    Step1["1. Schema Migration<br/>(Flyway Vx.sql)"] --> Step2["2. Entità JPA<br/>(@Entity)"]
-    Step2 --> Step3["3. Repository JPA<br/>(Spring Data)"]
-    Step3 --> Step4["4. Business Service<br/>(Logica & Transazioni)"]
-    Step4 --> Step5["5. REST Controller<br/>(Swagger OpenAPI)"]
-    Step5 --> Step6["6. Unit & Integration Test<br/>(JUnit 5 + H2)"]
-```
-
-1. **Modifica dello Schema Database**:
-   - Creare un nuovo script di migrazione Flyway incrementale in `db/migration/` (es. `V2__nome_migrazione.sql`).
-   - Non modificare mai a ritroso migrazioni già rilasciate.
-2. **Aggiornamento o Creazione dell'Entità JPA**:
-   - Mappare le nuove colonne nell'entità corrispondente (es. [Expense.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Data/Expense.java)).
-   - Aggiungere le opportune annotazioni Swagger `@Schema` e i vincoli JPA.
-3. **Estensione del Repository**:
-   - Dichiarare i metodi di query in [IExpenseRepository.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Repository/IExpenseRepository.java) o [IUserRepository.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Repository/IUserRepository.java).
-4. **Logica di Business nel Service**:
-   - Implementare il metodo nel rispettivo Service annotandolo con `@Transactional` (o `@Transactional(readOnly = true)` per le operazioni di sola lettura).
-5. **Esposizione nel Controller**:
-   - Aggiungere l'endpoint nel Controller ([ExpenseController.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Controller/ExpenseController.java) o [AuthController.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Controller/AuthController.java)).
-   - Annotare l'operazione con `@Operation`, `@ApiResponses`, `@RequestBody` e `@SecurityRequirement(name = "bearerAuth")`.
-6. **Scrittura dei Test Automatici**:
-   - Aggiungere il test unitario o di integrazione in `src/test/java/`. I test di persistenza utilizzano il profilo H2 in-memory configurato in [application-test.properties](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/test/resources/application-test.properties) senza richiedere MySQL locale.
-
----
-
-## 6. Convenzioni di Codice e Git
-
-### 6.1. Convenzioni Git e Commit Messages
-Il repository adotta lo standard **Conventional Commits**:
-- `feat: <descrizione>`: Nuove funzionalità applicative.
-- `fix: <descrizione>`: Correzione di anomalie o vulnerabilità di sicurezza.
-- `refactor: <descrizione>`: Ristrutturazione del codice senza alterazione del comportamento esterno.
-- `chore: <descrizione>`: Pulizia file di build, aggiornamento dipendenze o configurazioni IDE.
-- `test: <descrizione>`: Aggiunta o estensione di test automatici.
-
-### 6.2. Regole di Qualità del Codice
-- **Virtual Threads**: Non utilizzare pool di thread `Executors.newFixedThreadPool()` per compiti I/O-bound: utilizzare sempre i Virtual Threads di Java 21 (`Executors.newVirtualThreadPerTaskExecutor()`).
-- **Nessuna Esposizione di Segreti**: Non effettuare mai il commit di file `.env`, file con estensione `.pem`, `.key` o credenziali in chiaro. La directory `keys/` e il file `.env` sono rigorosamente inclusi in [.gitignore](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/.gitignore).
-- **Trattamento Eccezioni**: Non inghiottire le eccezioni con blocchi `catch` vuoti; registrare sempre l'errore tramite SLF4J `log.error(...)` o `log.warn(...)`.
+I JAR eseguibili Spring Boot repackaged vengono generati in:
+- `AuthMicroService/target/AuthMicroService-0.0.1-SNAPSHOT.jar`
+- `ExpenseMicroService/target/ExpenseMicroService-0.0.1-SNAPSHOT.jar`
+- `Gateway/target/Gateway-0.0.1-SNAPSHOT.jar`
