@@ -44,7 +44,6 @@ Engineered on **Java 21** and **Spring Boot 3.5**, Spendy utilizes a reactive **
 - [Docker & Containerized Deployment](#-docker--containerized-deployment)
 - [Testing & Quality Assurance](#-testing--quality-assurance)
   - [Unit & Integration Tests](#unit--integration-tests)
-  - [Performance & Load Testing (k6)](#performance--load-testing-k6)
 - [License](#-license)
 
 ---
@@ -166,7 +165,6 @@ flowchart LR
 | **CSV Parsing** | OpenCSV 5.9 | Robust delimited file parser for financial statement imports |
 | **Build System** | Maven 3.9+ | Multi-module build management with `license-maven-plugin` |
 | **Testing** | JUnit 5, Mockito, JaCoCo, H2 | Unit tests, mock slices, and JPA integration tests |
-| **Load Testing** | k6 | Asynchronous stress and load benchmark suites |
 | **Deployment** | Docker & Docker Compose | Multi-stage lightweight OCI container image and compose orchestration |
 
 ---
@@ -418,29 +416,14 @@ mysql -u root -p < init-db.sql
 ```
 *Note: Flyway automatically applies versioned DDL migrations (`V1__create_auth_schema.sql` and `V1__create_expense_schema.sql`) when the microservices start up.*
 
-### 2. Migrating Data from MongoDB (Optional)
-If migrating an existing MongoDB database to MySQL, execute the idempotent data migration tool:
-```bash
-# Dry run check (no database changes)
-python3 scripts/migrate_mongo_to_mysql.py --dry-run
-
-# Run migration
-python3 scripts/migrate_mongo_to_mysql.py \
-  --mongo-uri "mongodb://localhost:27017" \
-  --mysql-host "localhost" \
-  --mysql-port 3306 \
-  --mysql-user "root" \
-  --mysql-password ""
-```
-
-### 3. Clone and Build
+### 2. Clone and Build
 ```bash
 git clone https://github.com/Giusk10/SpendyApp.git
 cd SpendyApp
 mvn clean install -DskipTests
 ```
 
-### 4. Running the Services Locally
+### 3. Running the Services Locally
 
 You can launch each service in separate terminal windows:
 
@@ -509,21 +492,6 @@ mvn test
 ```
 JaCoCo reports are generated under:
 `*/target/site/jacoco/index.html`
-
-### Performance & Load Testing (k6)
-Stress test scripts are available in the `performance-tests/` directory:
-
-1. **Authentication Stress Test** (`load-multiple-login-test.js`):
-   Simulates 50 concurrent users performing logins through the gateway with a p95 response time threshold of < 2600ms.
-   ```bash
-   k6 run performance-tests/load-multiple-login-test.js
-   ```
-
-2. **Full Pipeline Add Expense Test** (`load-multiple-add-test.js`):
-   Simulates concurrent user logins, Bearer token extraction, and synchronous transaction creation via `/Expense/rest/expense/addExpense` with a threshold of < 2000ms.
-   ```bash
-   k6 run performance-tests/load-multiple-add-test.js
-   ```
 
 ---
 
