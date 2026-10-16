@@ -16,6 +16,14 @@ public interface IRefreshTokenRepository extends JpaRepository<RefreshToken, Str
 
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM RefreshToken r WHERE r.tokenHash = :tokenHash")
+    Optional<RefreshToken> findByTokenHashForUpdate(@Param("tokenHash") String tokenHash);
+
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM RefreshToken r WHERE r.token = :token")
+    Optional<RefreshToken> findByTokenForUpdate(@Param("token") String token);
+
     List<RefreshToken> findByFamilyId(String familyId);
 
     @Modifying

@@ -240,4 +240,25 @@ class JwtSecurityHardeningTest {
         String subject = jwtTokenService.verifyTokenAndGetSubject(oldToken.serialize());
         assertEquals("heidi", subject, "Il token con kid della chiave precedente deve essere verificato con successo durante la rotazione");
     }
+
+    // 11. Token con kid sconosciuto rifiutato
+    @Test
+    @DisplayName("11. JWT con kid sconosciuto viene rifiutato categoricamente anche se firmato con chiave nota")
+    void testUnknownKidExplicitlyRejected() throws Exception {
+        JWTClaimsSet claims = new JWTClaimsSet.Builder()
+                .subject("ivan")
+                .issuer(ISSUER)
+                .audience(AUDIENCE)
+                .expirationTime(new Date(System.currentTimeMillis() + 60000))
+                .build();
+
+        SignedJWT unknownKidJwt = new SignedJWT(
+                new JWSHeader.Builder(JWSAlgorithm.RS256).keyID("malicious-or-unknown-kid-999").build(),
+                claims
+        );
+        unknownKidJwt.sign(new RSASSASigner(privateKey));
+
+        String subject = jwtTokenService.verifyTokenAndGetSubject(unknownKidJwt.serialize());
+        assertNull(subject, "Un token con kid sconosciuto non deve ricadere silenziosamente sulla chiave di default e deve essere rifiutato");
+    }
 }

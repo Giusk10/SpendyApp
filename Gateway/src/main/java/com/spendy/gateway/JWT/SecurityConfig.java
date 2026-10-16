@@ -159,7 +159,7 @@ public class SecurityConfig {
                                 "/Auth/v3/api-docs", "/Auth/v3/api-docs/**",
                                 "/Expense/v3/api-docs", "/Expense/v3/api-docs/**").permitAll()
                         .pathMatchers(HttpMethod.POST, "/Auth/rest/auth/login", "/Auth/rest/auth/register",
-                                "/Auth/rest/auth/refresh")
+                                "/Auth/rest/auth/refresh", "/Auth/rest/auth/logout")
                         .permitAll()
                         .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/health", "/Auth/rest/auth/jwks.json",
                                 "/Auth/rest/auth/.well-known/jwks.json")
@@ -167,7 +167,6 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/profile").authenticated()
                         .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/updateProfile").authenticated()
                         .pathMatchers(HttpMethod.PUT, "/Auth/rest/auth/updateProfile").authenticated()
-                        .pathMatchers(HttpMethod.POST, "/Auth/rest/auth/logout").authenticated()
                         .pathMatchers("/Expense/**").authenticated()
                         .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
@@ -183,12 +182,35 @@ public class SecurityConfig {
                 .build();
     }
 
+    public static boolean isProductionEnvironment() {
+        String profile = System.getProperty("spring.profiles.active");
+        if (profile == null) {
+            profile = System.getenv("SPRING_PROFILES_ACTIVE");
+        }
+        if (profile != null && (profile.contains("prod") || profile.contains("production"))) {
+            return true;
+        }
+        String env = System.getenv("ENVIRONMENT");
+        if (env != null && (env.equalsIgnoreCase("production") || env.equalsIgnoreCase("prod"))) {
+            return true;
+        }
+        String appEnv = System.getenv("ENV");
+        if (appEnv != null && (appEnv.equalsIgnoreCase("production") || appEnv.equalsIgnoreCase("prod"))) {
+            return true;
+        }
+        String hf = System.getenv("SPACE_ID");
+        return hf != null && !hf.isBlank();
+    }
+
     private RSAPublicKey loadPublicKey(String pem, String location, boolean allowEphemeralKeys, ResourceLoader resourceLoader) {
         try {
             if ((pem == null || pem.isBlank()) && location != null && !location.isBlank()) {
                 pem = readResourceContent(location, resourceLoader);
             }
             if (pem == null || pem.isBlank()) {
+                if (isProductionEnvironment() && allowEphemeralKeys) {
+                    throw new IllegalStateException("CRITICAL SECURITY ERROR: Ephemeral keys are strictly forbidden in production mode in Gateway.");
+                }
                 if (!allowEphemeralKeys) {
                     throw new IllegalStateException("CRITICAL SECURITY ERROR: Gateway requires an RSA public key in production " +
                             "(set JWT_PUBLIC_KEY, JWT_PUBLIC_KEY_LOCATION, or JWT_JWK_SET_URI). Ephemeral key fallback is disabled.");

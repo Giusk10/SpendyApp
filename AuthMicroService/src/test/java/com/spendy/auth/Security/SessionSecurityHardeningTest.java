@@ -71,9 +71,10 @@ class SessionSecurityHardeningTest {
         assertNotNull(successResult.getAccessToken());
         assertNotNull(successResult.getRefreshToken());
 
-        // Verifica che il refresh token sia generato e salvato con hash
+        // Verifica che il refresh token sia generato e salvato con solo hash sicuro e token in chiaro nullo
         ArgumentCaptor<RefreshToken> captor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository, times(1)).save(captor.capture());
+        assertNull(captor.getValue().getToken(), "Il token in chiaro non deve mai essere memorizzato nel database");
         assertNotNull(captor.getValue().getTokenHash());
         assertNotNull(captor.getValue().getFamilyId());
         assertFalse(captor.getValue().isRevoked());
@@ -82,7 +83,7 @@ class SessionSecurityHardeningTest {
         AuthResult badPassResult = authService.login(username, "wrongPassword");
         assertEquals(StatusAuth.INVALID_CREDENTIALS, badPassResult.getStatusAuth());
 
-        // Login con utente inesistente -> USER_NOT_FOUND (gestito uniformemente con 401 nel controller)
+        // Login con utente inesistente -> USER_NOT_FOUND (gestito uniformemente con 401 nel controller e timing costante)
         when(userRepository.findByUsername("unknownUser")).thenReturn(null);
         when(userRepository.findByEmail("unknownUser")).thenReturn(null);
         AuthResult notFoundResult = authService.login("unknownUser", password);
@@ -96,9 +97,9 @@ class SessionSecurityHardeningTest {
         String rawToken = authService.generateSecureRefreshToken();
         String tokenHash = AuthService.hashToken(rawToken);
         String familyId = UUID.randomUUID().toString();
-        RefreshToken activeToken = new RefreshToken(rawToken, tokenHash, "mario", familyId, LocalDateTime.now().plusDays(30));
+        RefreshToken activeToken = new RefreshToken(null, tokenHash, "mario", familyId, LocalDateTime.now().plusDays(30));
 
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(activeToken));
+        when(refreshTokenRepository.findByTokenHashForUpdate(tokenHash)).thenReturn(Optional.of(activeToken));
 
         AuthResult result = authService.refreshAccessToken(rawToken);
 
@@ -118,9 +119,9 @@ class SessionSecurityHardeningTest {
     void testExpiredRefreshTokenRejected() {
         String rawToken = authService.generateSecureRefreshToken();
         String tokenHash = AuthService.hashToken(rawToken);
-        RefreshToken expiredToken = new RefreshToken(rawToken, tokenHash, "mario", "fam-1", LocalDateTime.now().minusHours(1));
+        RefreshToken expiredToken = new RefreshToken(null, tokenHash, "mario", "fam-1", LocalDateTime.now().minusHours(1));
 
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(expiredToken));
+        when(refreshTokenRepository.findByTokenHashForUpdate(tokenHash)).thenReturn(Optional.of(expiredToken));
 
         AuthResult result = authService.refreshAccessToken(rawToken);
 
@@ -138,10 +139,10 @@ class SessionSecurityHardeningTest {
         String familyId = "compromised-family-123";
 
         // Token già revocato/ruotato in precedenza
-        RefreshToken alreadyRevokedToken = new RefreshToken(rotatedRawToken, tokenHash, "mario", familyId, LocalDateTime.now().plusDays(30));
+        RefreshToken alreadyRevokedToken = new RefreshToken(null, tokenHash, "mario", familyId, LocalDateTime.now().plusDays(30));
         alreadyRevokedToken.setRevoked(true);
 
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(alreadyRevokedToken));
+        when(refreshTokenRepository.findByTokenHashForUpdate(tokenHash)).thenReturn(Optional.of(alreadyRevokedToken));
 
         // Un attaccante o client obsoleto tenta di usare il token ruotato
         AuthResult result = authService.refreshAccessToken(rotatedRawToken);
@@ -158,9 +159,9 @@ class SessionSecurityHardeningTest {
         String rawToken = authService.generateSecureRefreshToken();
         String tokenHash = AuthService.hashToken(rawToken);
         String familyId = "concurrent-family-1";
-        RefreshToken token = new RefreshToken(rawToken, tokenHash, "mario", familyId, LocalDateTime.now().plusDays(30));
+        RefreshToken token = new RefreshToken(null, tokenHash, "mario", familyId, LocalDateTime.now().plusDays(30));
 
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(token));
+        when(refreshTokenRepository.findByTokenHashForUpdate(tokenHash)).thenReturn(Optional.of(token));
 
         int threads = 2;
         ExecutorService executor = Executors.newFixedThreadPool(threads);
@@ -173,7 +174,7 @@ class SessionSecurityHardeningTest {
             executor.submit(() -> {
                 try {
                     startLatch.await();
-                    // In a synchronized/transactional environment, the first call revokes the token
+                    // In a synchronized/transactional environment with row locking, the first call revokes the token
                     synchronized (token) {
                         AuthResult res = authService.refreshAccessToken(rawToken);
                         if (res.getStatusAuth() == StatusAuth.SUCCESS) {
@@ -202,9 +203,9 @@ class SessionSecurityHardeningTest {
         String rawToken = authService.generateSecureRefreshToken();
         String tokenHash = AuthService.hashToken(rawToken);
         String familyId = "logout-family-1";
-        RefreshToken token = new RefreshToken(rawToken, tokenHash, "mario", familyId, LocalDateTime.now().plusDays(30));
+        RefreshToken token = new RefreshToken(null, tokenHash, "mario", familyId, LocalDateTime.now().plusDays(30));
 
-        when(refreshTokenRepository.findByTokenHash(tokenHash)).thenReturn(Optional.of(token));
+        when(refreshTokenRepository.findByTokenHashForUpdate(tokenHash)).thenReturn(Optional.of(token));
 
         boolean loggedOut = authService.logout(rawToken);
 

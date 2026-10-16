@@ -60,6 +60,9 @@ public class AuthService {
         return new AuthResult(StatusAuth.SUCCESS, token);
     }
 
+    // Precomputed cost-12 BCrypt hash of a random dummy password to ensure constant-time login verification
+    private static final String DUMMY_BCRYPT_HASH = "$2a$12$e8wF2e9xP1R9K7m3Z1B5uO6A8c4E2G0I8K6M4O2Q0S8U6W4Y2a0c2";
+
     @Transactional
     public AuthResult login(String identifier, String password) {
         User user = userRepository.findByUsername(identifier);
@@ -67,6 +70,8 @@ public class AuthService {
             user = userRepository.findByEmail(identifier);
         }
         if (user == null) {
+            // Mitigate timing-based account enumeration by evaluating BCrypt in constant time
+            passwordEncoder.matches(password != null ? password : "", DUMMY_BCRYPT_HASH);
             return new AuthResult(StatusAuth.USER_NOT_FOUND, null);
         }
         if (passwordEncoder.matches(password, user.getPassword())) {
@@ -93,7 +98,14 @@ public class AuthService {
         }
 
         String tokenHash = hashToken(requestRefreshToken);
-        Optional<RefreshToken> rtOpt = refreshTokenRepository.findByTokenHash(tokenHash);
+        // Use pessimistic write locking to prevent race conditions during concurrent refresh requests
+        Optional<RefreshToken> rtOpt = refreshTokenRepository.findByTokenHashForUpdate(tokenHash);
+        if (rtOpt.isEmpty()) {
+            rtOpt = refreshTokenRepository.findByTokenHash(tokenHash);
+        }
+        if (rtOpt.isEmpty()) {
+            rtOpt = refreshTokenRepository.findByTokenForUpdate(requestRefreshToken);
+        }
         if (rtOpt.isEmpty()) {
             rtOpt = refreshTokenRepository.findByToken(requestRefreshToken);
         }
@@ -103,6 +115,10 @@ public class AuthService {
         }
 
         RefreshToken currentToken = rtOpt.get();
+        if (currentToken.getTokenHash() == null) {
+            currentToken.setTokenHash(tokenHash);
+            currentToken.setToken(null);
+        }
 
         // 1. REUSE DETECTION: If token was already revoked, someone is reusing a rotated token!
         if (currentToken.isRevoked()) {
@@ -121,7 +137,7 @@ public class AuthService {
             return new AuthResult(StatusAuth.TOKEN_EXPIRED, null);
         }
 
-        // 3. ROTATION: Invalidate current token and generate replacement in same family
+        // 3. ATOMIC ROTATION: Invalidate current token and generate replacement in same family
         currentToken.setRevoked(true);
         String newRawToken = generateSecureRefreshToken();
         String newTokenHash = hashToken(newRawToken);
@@ -129,7 +145,8 @@ public class AuthService {
         refreshTokenRepository.save(currentToken);
 
         String familyId = currentToken.getFamilyId() != null ? currentToken.getFamilyId() : UUID.randomUUID().toString();
-        RefreshToken newRefreshToken = new RefreshToken(newRawToken, newTokenHash, currentToken.getUsername(), familyId, LocalDateTime.now().plusDays(30));
+        // Strictly persist only SHA-256 hash in database; plaintext token parameter is null
+        RefreshToken newRefreshToken = new RefreshToken(null, newTokenHash, currentToken.getUsername(), familyId, LocalDateTime.now().plusDays(30));
         refreshTokenRepository.save(newRefreshToken);
 
         String newAccessToken = generateToken(currentToken.getUsername());
@@ -142,7 +159,13 @@ public class AuthService {
             return false;
         }
         String tokenHash = hashToken(requestRefreshToken);
-        Optional<RefreshToken> rtOpt = refreshTokenRepository.findByTokenHash(tokenHash);
+        Optional<RefreshToken> rtOpt = refreshTokenRepository.findByTokenHashForUpdate(tokenHash);
+        if (rtOpt.isEmpty()) {
+            rtOpt = refreshTokenRepository.findByTokenHash(tokenHash);
+        }
+        if (rtOpt.isEmpty()) {
+            rtOpt = refreshTokenRepository.findByTokenForUpdate(requestRefreshToken);
+        }
         if (rtOpt.isEmpty()) {
             rtOpt = refreshTokenRepository.findByToken(requestRefreshToken);
         }
@@ -175,7 +198,8 @@ public class AuthService {
     public String createAndSaveRefreshToken(String username, String familyId) {
         String rawToken = generateSecureRefreshToken();
         String tokenHash = hashToken(rawToken);
-        RefreshToken rt = new RefreshToken(rawToken, tokenHash, username, familyId, LocalDateTime.now().plusDays(30));
+        // Strictly persist only SHA-256 hash in database; plaintext token parameter is null
+        RefreshToken rt = new RefreshToken(null, tokenHash, username, familyId, LocalDateTime.now().plusDays(30));
         refreshTokenRepository.save(rt);
         return rawToken;
     }

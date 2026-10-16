@@ -501,4 +501,57 @@ class AuthControllerTest {
         assertTrue(entity.contains("accessToken123"));
         assertTrue(entity.contains("refreshToken456"));
     }
+
+    @Test
+    void testLoginNullPayloadReturnsBadRequest() {
+        Response response = authController.login(null);
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+
+    @Test
+    void testLoginPasswordTooLongReturnsBadRequest() {
+        User user = new User();
+        user.setUsername("testuser");
+        user.setPassword("a".repeat(129));
+        Response response = authController.login(user);
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+
+    @Test
+    void testRegisterNullPayloadReturnsBadRequest() {
+        Response response = authController.register(null);
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+
+    @Test
+    void testRegisterPasswordTooShortReturnsBadRequest() {
+        User user = new User();
+        user.setUsername("testuser");
+        user.setEmail("valid@test.com");
+        user.setPassword("short");
+        Response response = authController.register(user);
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+
+    @Test
+    void testRegisterPasswordTooLongReturnsBadRequest() {
+        User user = new User();
+        user.setUsername("testuser");
+        user.setEmail("valid@test.com");
+        user.setPassword("a".repeat(129));
+        Response response = authController.register(user);
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+
+    @Test
+    void testRefreshTokenNullPayloadReturnsBadRequest() {
+        Response response = authController.refreshToken(null);
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
+
+    @Test
+    void testUpdateProfileNullPayloadReturnsBadRequest() {
+        Response response = authController.updateProfile("Bearer validtoken", null);
+        assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    }
 }

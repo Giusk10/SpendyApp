@@ -39,6 +39,7 @@ public class AuthController {
 
     private static final String EMAIL_REGEX = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
     private static final Pattern EMAIL_PATTERN = Pattern.compile(EMAIL_REGEX);
+    private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_.-]+$");
 
     @Operation(
         summary = "User login",
@@ -54,6 +55,11 @@ public class AuthController {
             responseCode = "200",
             description = "Authentication successful; returns access and refresh tokens",
             content = @Content(mediaType = "application/json", schema = @Schema(implementation = TokenResponse.class))
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Missing or invalid request payload",
+            content = @Content(mediaType = "text/plain", schema = @Schema(example = "Payload di login obbligatorio"))
         ),
         @ApiResponse(
             responseCode = "401",
@@ -77,14 +83,35 @@ public class AuthController {
     @Consumes("application/json")
     @Produces("application/json")
     public Response login(@org.springframework.web.bind.annotation.RequestBody(required = false) User user) {
-        AuthResult result;
+        if (user == null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Payload di login obbligatorio").build();
+        }
+
         String password = user.getPassword();
         String username = user.getUsername();
-        if (username == null) {
-            String email = user.getEmail();
-            result = authService.login(email, password);
+        String email = user.getEmail();
+
+        if (password == null || password.isBlank()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Password obbligatoria").build();
+        }
+        if (password.length() > 128) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Password troppo lunga").build();
+        }
+        if ((username == null || username.isBlank()) && (email == null || email.isBlank())) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Username o email obbligatori").build();
+        }
+        if (username != null && username.length() > 50) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Username non valido").build();
+        }
+        if (email != null && email.length() > 150) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Email non valida").build();
+        }
+
+        AuthResult result;
+        if (username == null || username.isBlank()) {
+            result = authService.login(email.trim(), password);
         } else {
-            result = authService.login(username, password);
+            result = authService.login(username.trim(), password);
         }
 
         if (result.getStatusAuth() == StatusAuth.SUCCESS) {
@@ -114,6 +141,11 @@ public class AuthController {
             content = @Content(mediaType = "text/plain", schema = @Schema(example = "Registration successful"))
         ),
         @ApiResponse(
+            responseCode = "400",
+            description = "Invalid registration data or password length",
+            content = @Content(mediaType = "text/plain", schema = @Schema(example = "Password deve contenere tra 8 e 128 caratteri"))
+        ),
+        @ApiResponse(
             responseCode = "401",
             description = "Invalid email format supplied",
             content = @Content(mediaType = "text/plain", schema = @Schema(example = "Email invalido"))
@@ -133,6 +165,9 @@ public class AuthController {
     @PostMapping(value = "/register", consumes = "application/json")
     @Path("/register")
     public Response register(@org.springframework.web.bind.annotation.RequestBody(required = false) User user) {
+        if (user == null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Payload di registrazione obbligatorio").build();
+        }
 
         String username = user.getUsername();
         String password = user.getPassword();
@@ -140,11 +175,26 @@ public class AuthController {
         String surname = user.getSurname();
         String email = user.getEmail();
 
-        if (!validateEmail(email)) {
+        if (!validateEmail(email) || (email != null && email.length() > 150)) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Email invalido").build();
         }
+        if (username == null || username.isBlank() || username.length() < 3 || username.length() > 50) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Username deve contenere tra 3 e 50 caratteri").build();
+        }
+        if (!USERNAME_PATTERN.matcher(username).matches()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Username contiene caratteri non consentiti").build();
+        }
+        if (password == null || password.length() < 8 || password.length() > 128) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Password deve contenere tra 8 e 128 caratteri").build();
+        }
+        if (name != null && name.length() > 100) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Nome troppo lungo").build();
+        }
+        if (surname != null && surname.length() > 100) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Cognome troppo lungo").build();
+        }
 
-        AuthResult result = authService.register(username, name, password, surname, email);
+        AuthResult result = authService.register(username.trim(), name, password, surname, email.trim());
         if (result.getStatusAuth() == StatusAuth.SUCCESS) {
             return Response.ok("Registration successful").build();
         } else if (result.getStatusAuth() == StatusAuth.USER_ALREADY_EXISTS) {
@@ -185,9 +235,15 @@ public class AuthController {
     @Consumes("application/json")
     @Produces("application/json")
     public Response refreshToken(@org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body) {
+        if (body == null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Refresh Token missing").build();
+        }
         String requestRefreshToken = body.get("refreshToken");
 
         if (requestRefreshToken == null || requestRefreshToken.isEmpty()) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Refresh Token missing").build();
+        }
+        if (requestRefreshToken.length() > 255) {
             return Response.status(Response.Status.BAD_REQUEST).entity("Refresh Token missing").build();
         }
 
@@ -335,6 +391,15 @@ public class AuthController {
         String accessToken = extractBearerToken(authHeader);
         if (accessToken == null) {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Missing or invalid Authorization header").build();
+        }
+        if (updatedUser == null) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("User payload required").build();
+        }
+        if (updatedUser.getName() != null && updatedUser.getName().length() > 100) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Nome troppo lungo").build();
+        }
+        if (updatedUser.getSurname() != null && updatedUser.getSurname().length() > 100) {
+            return Response.status(Response.Status.BAD_REQUEST).entity("Cognome troppo lungo").build();
         }
         AuthResult result = authService.updateUserProfile(accessToken, updatedUser);
 

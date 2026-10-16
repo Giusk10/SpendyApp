@@ -394,5 +394,23 @@ class ExpenseControllerTest {
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         assertEquals("Invalid or expired token.", response.getBody());
     }
+
+    @Test
+    void testAddExpenseNullBodyReturnsBadRequest() {
+        ResponseEntity<Object> response = expenseController.addExpense(null, authHeader);
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void testUpdateExpenseNullBodyReturnsBadRequest() {
+        ResponseEntity<Object> response = expenseController.updateExpense(null, authHeader);
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void testDeleteExpenseNullBodyReturnsBadRequest() {
+        ResponseEntity<Object> response = expenseController.deleteExpense(null, authHeader);
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
 }
 

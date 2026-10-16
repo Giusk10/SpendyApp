@@ -2,7 +2,16 @@
 
 echo "🚀 Avvio SpendyApp All-in-One..."
 
-# Assicura chiavi RSA condivise se non esplicitamente configurate via env
+# In produzione, rifiuta l'avvio se mancano chiavi valide configurate
+if [ "$ENVIRONMENT" = "production" ] || [ "$SPRING_PROFILES_ACTIVE" = "production" ] || [ "$JWT_ALLOW_EPHEMERAL_KEYS" = "false" ]; then
+    if [ -z "$JWT_PRIVATE_KEY" ] && [ -z "$JWT_PRIVATE_KEY_LOCATION" ]; then
+        echo "❌ ERRORE CRITICO DI SICUREZZA: Chiavi RSA obbligatorie mancanti in produzione!"
+        echo "Configurare JWT_PRIVATE_KEY o JWT_PRIVATE_KEY_LOCATION prima dell'avvio."
+        exit 1
+    fi
+fi
+
+# In ambiente di sviluppo/test locale, genera chiavi RSA condivise se non esplicitamente configurate
 if [ -z "$JWT_PRIVATE_KEY" ] && [ -z "$JWT_PRIVATE_KEY_LOCATION" ]; then
     mkdir -p /app/keys
     if [ ! -f /app/keys/private_key.pem ]; then

@@ -109,6 +109,7 @@ public class JwtTokenService {
         this.allowEphemeralKeys = true;
         if (publicKey != null) {
             this.verificationKeys.put(this.activeKeyId, publicKey);
+            this.verificationKeys.put("default", publicKey);
         }
         initJwkSet();
     }
@@ -127,6 +128,7 @@ public class JwtTokenService {
         }
 
         this.verificationKeys.put(this.activeKeyId, this.publicKey);
+        this.verificationKeys.put("default", this.publicKey);
 
         // Load any previous public keys for rotation window
         loadPreviousPublicKeys();
@@ -167,7 +169,17 @@ public class JwtTokenService {
 
     public synchronized void initJwkSet() {
         List<JWK> keys = new ArrayList<>();
+        if (this.publicKey != null) {
+            keys.add(new RSAKey.Builder(this.publicKey)
+                    .keyUse(KeyUse.SIGNATURE)
+                    .algorithm(JWSAlgorithm.RS256)
+                    .keyID(this.activeKeyId)
+                    .build());
+        }
         for (Map.Entry<String, RSAPublicKey> entry : verificationKeys.entrySet()) {
+            if (entry.getKey().equals(this.activeKeyId) || entry.getKey().equals("default")) {
+                continue;
+            }
             RSAKey rsaKey = new RSAKey.Builder(entry.getValue())
                     .keyUse(KeyUse.SIGNATURE)
                     .algorithm(JWSAlgorithm.RS256)
@@ -307,10 +319,32 @@ public class JwtTokenService {
     }
 
     private RSAPublicKey resolveVerificationKey(String kid) {
-        if (kid != null && verificationKeys.containsKey(kid)) {
+        if (kid != null && !kid.isBlank()) {
+            // Strictly resolve by registered kid; if kid is unrecognized, return null to reject
             return verificationKeys.get(kid);
         }
+        // Fall back to active default key only for legacy tokens that did not specify a kid
         return this.publicKey;
+    }
+
+    public static boolean isProductionEnvironment() {
+        String profile = System.getProperty("spring.profiles.active");
+        if (profile == null) {
+            profile = System.getenv("SPRING_PROFILES_ACTIVE");
+        }
+        if (profile != null && (profile.contains("prod") || profile.contains("production"))) {
+            return true;
+        }
+        String env = System.getenv("ENVIRONMENT");
+        if (env != null && (env.equalsIgnoreCase("production") || env.equalsIgnoreCase("prod"))) {
+            return true;
+        }
+        String appEnv = System.getenv("ENV");
+        if (appEnv != null && (appEnv.equalsIgnoreCase("production") || appEnv.equalsIgnoreCase("prod"))) {
+            return true;
+        }
+        String hf = System.getenv("SPACE_ID");
+        return hf != null && !hf.isBlank();
     }
 
     public Map<String, Object> getJwkSetAsMap() {
@@ -364,6 +398,11 @@ public class JwtTokenService {
                 PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
                 KeyFactory kf = KeyFactory.getInstance("RSA");
                 return (RSAPrivateKey) kf.generatePrivate(keySpec);
+            }
+
+            if (isProductionEnvironment() && allowEphemeralKeys) {
+                throw new IllegalStateException("CRITICAL SECURITY ERROR: Ephemeral keys are strictly forbidden in production mode. " +
+                        "Configure valid RSA keys (jwt.private-key or jwt.private-key-location) and set jwt.allow-ephemeral-keys=false.");
             }
 
             if (!allowEphemeralKeys) {

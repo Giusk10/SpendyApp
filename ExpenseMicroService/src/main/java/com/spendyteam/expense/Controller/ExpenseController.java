@@ -170,7 +170,7 @@ public class ExpenseController {
     })
     @PostMapping(value = "/getExpenseByDate", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getExpenseByDate(
-        @org.springframework.web.bind.annotation.RequestBody Map<String, String> body,
+        @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
         @Parameter(
             name = "Authorization",
             description = "JWT Bearer access token formatted as 'Bearer <token>'",
@@ -183,6 +183,9 @@ public class ExpenseController {
         String token = extractBearerToken(authHeader);
         if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
+        if (body == null) {
+            return ResponseEntity.badRequest().body(java.util.Collections.singletonMap("error", "Request body is required"));
         }
         try {
             String startedDate = body.get("startedDate");
@@ -230,7 +233,7 @@ public class ExpenseController {
     })
     @PostMapping(value = "/getExpenseByMonth", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getExpenseByMonth_Year(
-        @org.springframework.web.bind.annotation.RequestBody Map<String, String> body,
+        @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
         @Parameter(
             name = "Authorization",
             description = "JWT Bearer access token formatted as 'Bearer <token>'",
@@ -243,6 +246,9 @@ public class ExpenseController {
         String token = extractBearerToken(authHeader);
         if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
+        if (body == null) {
+            return ResponseEntity.badRequest().body(java.util.Collections.singletonMap("error", "Request body is required"));
         }
         try {
             String month = body.get("month");
@@ -289,7 +295,7 @@ public class ExpenseController {
     })
     @PostMapping(value = "/getMonthlyAmountOfYear", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getMonthly_Amount_of_Year(
-        @org.springframework.web.bind.annotation.RequestBody Map<String, String> body,
+        @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
         @Parameter(
             name = "Authorization",
             description = "JWT Bearer access token formatted as 'Bearer <token>'",
@@ -302,6 +308,9 @@ public class ExpenseController {
         String token = extractBearerToken(authHeader);
         if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
+        if (body == null) {
+            return ResponseEntity.badRequest().body(java.util.Collections.singletonMap("error", "Request body is required"));
         }
         try {
             String year = body.get("year");
@@ -352,7 +361,7 @@ public class ExpenseController {
     })
     @DeleteMapping(value = "/deleteExpense", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Object> deleteExpense(
-        @org.springframework.web.bind.annotation.RequestBody Map<String, String> body,
+        @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
         @Parameter(
             name = "Authorization",
             description = "JWT Bearer access token formatted as 'Bearer <token>'",
@@ -365,6 +374,9 @@ public class ExpenseController {
         String token = extractBearerToken(authHeader);
         if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
+        }
+        if (body == null || body.get("expenseId") == null || body.get("expenseId").isBlank()) {
+            return ResponseEntity.badRequest().body("Expense ID is required");
         }
         try {
             Response res = expenseService.deleteExpense(body.get("expenseId"), token);
@@ -456,7 +468,7 @@ public class ExpenseController {
     })
     @PostMapping(value = "/addExpense", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Object> addExpense(
-        @org.springframework.web.bind.annotation.RequestBody Map<String, String> body,
+        @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
         @Parameter(
             name = "Authorization",
             description = "JWT Bearer access token formatted as 'Bearer <token>'",
@@ -469,6 +481,9 @@ public class ExpenseController {
         String token = extractBearerToken(authHeader);
         if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
+        if (body == null) {
+            return ResponseEntity.badRequest().body("Request body is required.");
         }
         try {
             Response res = expenseService.addExpense(body, token);
@@ -516,7 +531,7 @@ public class ExpenseController {
     })
     @PostMapping(value = "/updateExpense", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Object> updateExpense(
-        @org.springframework.web.bind.annotation.RequestBody Map<String, String> body,
+        @org.springframework.web.bind.annotation.RequestBody(required = false) Map<String, String> body,
         @Parameter(
             name = "Authorization",
             description = "JWT Bearer access token formatted as 'Bearer <token>'",
@@ -529,6 +544,9 @@ public class ExpenseController {
         String token = extractBearerToken(authHeader);
         if (token == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token");
+        }
+        if (body == null) {
+            return ResponseEntity.badRequest().body("Request body is required.");
         }
         try {
             Response res = expenseService.updateExpense(body, token);

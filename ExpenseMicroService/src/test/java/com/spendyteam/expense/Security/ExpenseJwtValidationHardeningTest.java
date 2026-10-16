@@ -140,4 +140,13 @@ class ExpenseJwtValidationHardeningTest {
         String username = userAuthService.getUsernameFromToken(token.serialize());
         assertEquals("rotatedUser", username, "Il token con kid ruotato deve essere validato correttamente");
     }
+
+    @Test
+    @DisplayName("JWT con kid sconosciuto viene rifiutato esplicitamente in ExpenseMicroService")
+    void testUnknownKidExplicitlyRejected() throws Exception {
+        String unknownKidToken = buildJwt(JWSAlgorithm.RS256, ISSUER, AUDIENCE, "attacker",
+                new Date(System.currentTimeMillis() + 60000), "unknown-unregistered-kid-999");
+        assertNull(userAuthService.getUsernameFromToken(unknownKidToken),
+                "Un JWT con kid sconosciuto non deve essere accettato da ExpenseService");
+    }
 }

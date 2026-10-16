@@ -23,7 +23,7 @@ RUN mvn clean package -DskipTests
 # --- FASE BASE: Runtime ---
 FROM eclipse-temurin:21-jdk-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache bash curl wget
+RUN apk add --no-cache bash curl wget openssl
 RUN adduser -D -u 1000 user
 RUN chown -R user:user /app
 

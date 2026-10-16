@@ -78,6 +78,7 @@ public class UserAuthService {
         this.gatewayUri = null;
         this.allowEphemeralKeys = true;
         if (publicKey != null) {
+            this.verificationKeys.put("spendy-auth-key-1", publicKey);
             this.verificationKeys.put("default", publicKey);
         }
     }
@@ -106,6 +107,26 @@ public class UserAuthService {
         this.gatewayUri = gatewayUri;
     }
 
+    public static boolean isProductionEnvironment() {
+        String profile = System.getProperty("spring.profiles.active");
+        if (profile == null) {
+            profile = System.getenv("SPRING_PROFILES_ACTIVE");
+        }
+        if (profile != null && (profile.contains("prod") || profile.contains("production"))) {
+            return true;
+        }
+        String env = System.getenv("ENVIRONMENT");
+        if (env != null && (env.equalsIgnoreCase("production") || env.equalsIgnoreCase("prod"))) {
+            return true;
+        }
+        String appEnv = System.getenv("ENV");
+        if (appEnv != null && (appEnv.equalsIgnoreCase("production") || appEnv.equalsIgnoreCase("prod"))) {
+            return true;
+        }
+        String hf = System.getenv("SPACE_ID");
+        return hf != null && !hf.isBlank();
+    }
+
     @PostConstruct
     public void init() {
         if (this.publicKey == null) {
@@ -114,9 +135,14 @@ public class UserAuthService {
 
         if (this.publicKey != null) {
             this.verificationKeys.put("spendy-auth-key-1", this.publicKey);
+            this.verificationKeys.put("default", this.publicKey);
         }
 
         loadPreviousPublicKeys();
+
+        if (isProductionEnvironment() && allowEphemeralKeys) {
+            throw new IllegalStateException("CRITICAL SECURITY ERROR: Ephemeral keys are strictly forbidden in production mode in ExpenseMicroService.");
+        }
 
         if (this.publicKey == null && !allowEphemeralKeys && webClient == null) {
             throw new IllegalStateException("CRITICAL SECURITY ERROR: ExpenseMicroService requires RSA public key in production " +
@@ -274,9 +300,11 @@ public class UserAuthService {
     }
 
     private RSAPublicKey resolveVerificationKey(String kid) {
-        if (kid != null && verificationKeys.containsKey(kid)) {
+        if (kid != null && !kid.isBlank()) {
+            // Strictly resolve by registered kid; return null if kid is unrecognized
             return verificationKeys.get(kid);
         }
+        // Fall back only for legacy tokens that omitted kid header
         if (this.publicKey != null) {
             return this.publicKey;
         }

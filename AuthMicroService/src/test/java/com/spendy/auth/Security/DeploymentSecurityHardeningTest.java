@@ -78,4 +78,19 @@ class DeploymentSecurityHardeningTest {
             assertFalse(content.contains("BEGIN PRIVATE KEY"), "application.properties non deve contenere chiavi private hardcoded");
         }
     }
+
+    // 5. Avvio in produzione con chiavi effimere fallisce con eccezione di sicurezza
+    @Test
+    @DisplayName("5. Avvio in produzione con chiavi effimere fallisce categoricamente con eccezione di sicurezza")
+    void testProductionStartupWithEphemeralKeysRejected() {
+        System.setProperty("spring.profiles.active", "prod");
+        try {
+            JwtTokenService service = new JwtTokenService(new DefaultResourceLoader());
+            service.setAllowEphemeralKeys(true);
+            IllegalStateException ex = assertThrows(IllegalStateException.class, service::init);
+            assertTrue(ex.getMessage().contains("strictly forbidden in production"));
+        } finally {
+            System.clearProperty("spring.profiles.active");
+        }
+    }
 }
