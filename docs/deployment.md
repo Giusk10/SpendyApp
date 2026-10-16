@@ -94,7 +94,7 @@ Il workflow CD si articola in due job sequenziali indipendenti per garantire che
   4. **Remote Ahead (`LOCAL == BASE`)**: Se il repository Hugging Face contiene commit più recenti non presenti nel branch locale, il deployment **fallisce immediatamente con errore esplicito**.
   5. **Divergenza (`LOCAL != BASE && REMOTE != BASE`)**: Se le storie hanno divergito (ad es. modifiche manuali ai metadati README dello Space o commit non sincronizzati), il deployment **si interrompe immediatamente con errore bloccante e istruzioni diagnostiche**, senza sovrascrivere i commit remoti.
 - **Forzatura controllata**: L'opzione `--force` è consentita **esclusivamente su autorizzazione esplicita dell'operatore** avviando manualmente il workflow via `workflow_dispatch` con il parametro `force_push: true`.
-- **Protezione credenziali**: Il token `HF_TOKEN` viene mascherato con `::add-mask::` e configurato tramite header HTTP Git (`http.https://huggingface.co/.extraheader`), evitando di esporre credenziali negli URL dei remote.
+- **Protezione credenziali**: Il token `HF_TOKEN` viene mascherato con `::add-mask::` e gestito in sicurezza tramite Git credential store temporaneo (`~/.git-credentials` protetto con permessi `0600`) e push URL dedicato, con prompt interattivi disabilitati (`GIT_TERMINAL_PROMPT=0`) e rimozione automatica garantita al termine dello step.
 
 #### Job 2: `verify-deployment` (Verifica Post-Deployment a Due Livelli)
 Il successo del push Git attesta unicamente che i file sorgente sono stati trasferiti. Per validare l'effettiva erogazione del servizio:

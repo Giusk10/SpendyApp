@@ -17,15 +17,15 @@ concurrency:
   group: deploy-huggingface
   cancel-in-progress: false
 
+env:
+  HF_USERNAME: ${{ secrets.HF_USERNAME || vars.HF_USERNAME }}
+  SPACE_NAME: ${{ secrets.SPACE_NAME || vars.SPACE_NAME }}
+
 jobs:
   deploy:
     name: Deploy All-in-One Space
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
-    outputs:
-      hf_username: ${{ steps.export-vars.outputs.hf_username }}
-      space_name: ${{ steps.export-vars.outputs.space_name }}
-      space_url: ${{ steps.export-vars.outputs.space_url }}
 
     steps:
       - name: Checkout repository
@@ -35,11 +35,8 @@ jobs:
           lfs: true
 
       - name: Validate Deployment Secrets
-        id: export-vars
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME || vars.HF_USERNAME }}
-          SPACE_NAME: ${{ secrets.SPACE_NAME || vars.SPACE_NAME }}
         run: |
           MISSING=0
           if [ -z "$HF_TOKEN" ]; then
@@ -59,16 +56,12 @@ jobs:
             exit 1
           fi
 
-          echo "hf_username=$HF_USERNAME" >> "$GITHUB_OUTPUT"
-          echo "space_name=$SPACE_NAME" >> "$GITHUB_OUTPUT"
-          echo "space_url=https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}" >> "$GITHUB_OUTPUT"
-          echo "✅ Tutti i secret necessari per Hugging Face Spaces sono configurati."
+          echo "✅ Tutti i parametri necessari per Hugging Face Spaces sono configurati."
+          echo "   Target Space: $HF_USERNAME/$SPACE_NAME"
 
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ steps.export-vars.outputs.hf_username }}
-          SPACE_NAME: ${{ steps.export-vars.outputs.space_name }}
           FORCE_PUSH: ${{ github.event.inputs.force_push || 'false' }}
         run: |
           echo "🚀 Configurazione sincronizzazione sicura per lo Space: $HF_USERNAME/$SPACE_NAME"
@@ -76,14 +69,27 @@ jobs:
           # Maschera il token di autenticazione nei log di GitHub Actions
           echo "::add-mask::$HF_TOKEN"
 
+          # Disabilita prompt terminale interattivo per prevenire blocchi in CI
+          export GIT_TERMINAL_PROMPT=0
+
           git config --global user.email "actions@github.com"
           git config --global user.name "GitHub Actions CI/CD"
 
-          # Configura autenticazione HTTP senza incorporare il token nell'URL del remote
-          git config --global "http.https://huggingface.co/.extraheader" "Authorization: Bearer $HF_TOKEN"
+          # Configura credenziali per huggingface.co tramite credential store temporaneo
+          git config --global credential.helper store
+          printf "https://%s:%s@huggingface.co\n" "$HF_USERNAME" "$HF_TOKEN" > "$HOME/.git-credentials"
+          chmod 600 "$HOME/.git-credentials"
+
+          # Garantisce la pulizia delle credenziali al termine dello step
+          cleanup_creds() {
+            rm -f "$HOME/.git-credentials"
+          }
+          trap cleanup_creds EXIT
 
           HF_REPO_URL="https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
-          git remote add space "$HF_REPO_URL"
+          HF_PUSH_URL="https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
+          git remote add space "$HF_REPO_URL" 2>/dev/null || git remote set-url space "$HF_REPO_URL"
+          git remote set-url --push space "$HF_PUSH_URL"
 
           echo "🔍 Verifica dello stato del repository di destinazione..."
           if [ "$FORCE_PUSH" = "true" ]; then
@@ -145,37 +151,39 @@ jobs:
         id: check-space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ needs.deploy.outputs.hf_username }}
-          SPACE_NAME: ${{ needs.deploy.outputs.space_name }}
         run: |
           echo "::add-mask::$HF_TOKEN"
           echo "=================================================="
           echo "⏳ Verifica stato infrastrutturale Space ($HF_USERNAME/$SPACE_NAME)..."
           echo "=================================================="
 
+          # Breve pausa iniziale per consentire all'infrastruttura di registrare il push
+          sleep 10
+
           MAX_WAIT=600 # 10 minuti di timeout per build container ed avvio JVM
           INTERVAL=15
-          ELAPSED=0
+          ELAPSED=10
           API_URL="https://huggingface.co/api/spaces/${HF_USERNAME}/${SPACE_NAME}"
+
+          # Determina host predefinito per fallback
+          CLEAN_USER=$(echo "$HF_USERNAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          CLEAN_SPACE=$(echo "$SPACE_NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+          TARGET_HOST="https://${CLEAN_USER}-${CLEAN_SPACE}.hf.space"
 
           while [ $ELAPSED -lt $MAX_WAIT ]; do
             RESPONSE=$(curl -s -H "Authorization: Bearer $HF_TOKEN" "$API_URL" || true)
 
             STAGE=$(echo "$RESPONSE" | jq -r '.runtime.stage // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
-            HOST=$(echo "$RESPONSE" | jq -r '.host // (if .subdomain then "https://" + .subdomain + ".hf.space" else "" end)' 2>/dev/null || echo "")
+            API_HOST=$(echo "$RESPONSE" | jq -r '.host // (if .subdomain then "https://" + .subdomain + ".hf.space" else "" end)' 2>/dev/null || echo "")
+            if [ -n "$API_HOST" ] && [ "$API_HOST" != "null" ]; then
+              TARGET_HOST="$API_HOST"
+            fi
 
             echo "   [$ELAPSED/${MAX_WAIT}s] Stato Space: $STAGE"
 
             if [ "$STAGE" = "RUNNING" ]; then
               echo "✅ Lo Space ha completato l'avvio ed è nello stato RUNNING!"
-              
-              # Fallback determinazione dominio se API non restituisce host
-              if [ -z "$HOST" ]; then
-                CLEAN_USER=$(echo "$HF_USERNAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-                CLEAN_SPACE=$(echo "$SPACE_NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
-                HOST="https://${CLEAN_USER}-${CLEAN_SPACE}.hf.space"
-              fi
-              echo "target_host=$HOST" >> "$GITHUB_OUTPUT"
+              echo "TARGET_HOST=$TARGET_HOST" >> "$GITHUB_ENV"
               exit 0
             fi
 
@@ -197,11 +205,14 @@ jobs:
           exit 1
 
       - name: Verify Application Readiness via Actuator Health Check
-        env:
-          TARGET_HOST: ${{ steps.check-space.outputs.target_host }}
-          HF_USERNAME: ${{ needs.deploy.outputs.hf_username }}
-          SPACE_NAME: ${{ needs.deploy.outputs.space_name }}
         run: |
+          # Fallback nel caso TARGET_HOST non sia stato valorizzato nello step precedente
+          if [ -z "${TARGET_HOST:-}" ]; then
+            CLEAN_USER=$(echo "$HF_USERNAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            CLEAN_SPACE=$(echo "$SPACE_NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            TARGET_HOST="https://${CLEAN_USER}-${CLEAN_SPACE}.hf.space"
+          fi
+
           echo "=================================================="
           echo "🩺 Verifica disponibilità applicativa (Readiness Check)"
           echo "   Target Host: $TARGET_HOST"
@@ -246,7 +257,7 @@ jobs:
           ELAPSED=0
           while [ "$ELAPSED" -lt "$MAX_WAIT" ]; do
             AUTH_CODE=$(curl -s -o /tmp/auth_health_body.json -w "%{http_code}" --connect-timeout 5 --max-time 10 "$AUTH_HEALTH_URL" 2>/dev/null || echo "000")
-            if [ "$AUTH_CODE" = "200" ] && grep -q '"status":"UP"' /tmp/auth_health_body.json 2>/dev/null; then
+            if [ "$AUTH_CODE" = "200" ] && grep -E -q 'AuthMicroService is running|"status":"UP"' /tmp/auth_health_body.json 2>/dev/null; then
               echo "✅ Route downstream Auth ha risposto 200 OK con stato UP!"
               AUTH_UP=1
               break
@@ -257,18 +268,19 @@ jobs:
           done
 
           if [ "$AUTH_UP" -ne 1 ]; then
-            echo "❌ ERRORE: Auth non ha raggiunto lo stato UP tramite Gateway entro ${MAX_WAIT}s." >&2
+            echo "❌ ERRORE: Auth non ha risposto UP tramite Gateway entro ${MAX_WAIT}s." >&2
             echo "   Ultimo codice HTTP ricevuto: $AUTH_CODE" >&2
             echo "   Consultare i log dello Space: https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}" >&2
             exit 1
           fi
 
       - name: Deployment Pipeline Summary
-        env:
-          HF_USERNAME: ${{ needs.deploy.outputs.hf_username }}
-          SPACE_NAME: ${{ needs.deploy.outputs.space_name }}
-          TARGET_HOST: ${{ steps.check-space.outputs.target_host }}
         run: |
+          if [ -z "${TARGET_HOST:-}" ]; then
+            CLEAN_USER=$(echo "$HF_USERNAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            CLEAN_SPACE=$(echo "$SPACE_NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+            TARGET_HOST="https://${CLEAN_USER}-${CLEAN_SPACE}.hf.space"
+          fi
           echo "=================================================="
           echo "🎉 DEPLOYMENT E VERIFICA RUNTIME COMPLETATI CON SUCCESSO!"
           echo "=================================================="
