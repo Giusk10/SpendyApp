@@ -12,7 +12,9 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import jakarta.annotation.PostConstruct;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.DefaultResourceLoader;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Service;
@@ -58,8 +60,13 @@ public class JwtTokenService {
     private RSAPublicKey publicKey;
     private JWKSet jwkSet;
 
+    public JwtTokenService() {
+        this(new DefaultResourceLoader());
+    }
+
+    @Autowired
     public JwtTokenService(ResourceLoader resourceLoader) {
-        this.resourceLoader = resourceLoader;
+        this.resourceLoader = resourceLoader != null ? resourceLoader : new DefaultResourceLoader();
     }
 
     // Constructor for testing with direct keys
