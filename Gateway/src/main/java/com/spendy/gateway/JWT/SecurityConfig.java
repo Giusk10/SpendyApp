@@ -70,15 +70,16 @@ public class SecurityConfig {
                     if (aud != null && aud.contains(audience)) {
                         return OAuth2TokenValidatorResult.success();
                     }
-                    return OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Invalid audience", null));
-                }
-        );
+                    return OAuth2TokenValidatorResult
+                            .failure(new OAuth2Error("invalid_token", "Invalid audience", null));
+                });
         decoder.setJwtValidator(withAudience);
         return decoder;
     }
 
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http, ReactiveJwtDecoder reactiveJwtDecoder) {
+    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http,
+            ReactiveJwtDecoder reactiveJwtDecoder) {
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
@@ -86,17 +87,22 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/webjars/**", "/favicon.ico").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
+                                "/webjars/**", "/favicon.ico")
+                        .permitAll()
                         .pathMatchers(HttpMethod.GET, "/Auth/v3/api-docs/**", "/Expense/v3/api-docs/**").permitAll()
-                        .pathMatchers(HttpMethod.POST, "/Auth/rest/auth/login", "/Auth/rest/auth/register", "/Auth/rest/auth/refresh").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/health", "/Auth/rest/auth/jwks.json", "/Auth/rest/auth/.well-known/jwks.json").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/Auth/rest/auth/login", "/Auth/rest/auth/register",
+                                "/Auth/rest/auth/refresh")
+                        .permitAll()
+                        .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/health", "/Auth/rest/auth/jwks.json",
+                                "/Auth/rest/auth/.well-known/jwks.json")
+                        .permitAll()
                         .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/profile").authenticated()
                         .pathMatchers(HttpMethod.GET, "/Auth/rest/auth/updateProfile").authenticated()
                         .pathMatchers(HttpMethod.PUT, "/Auth/rest/auth/updateProfile").authenticated()
                         .pathMatchers("/Auth/**").permitAll()
                         .pathMatchers("/Expense/**").authenticated()
-                        .anyExchange().authenticated()
-                )
+                        .anyExchange().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2
                         .jwt(jwt -> jwt.jwtDecoder(reactiveJwtDecoder))
                         .authenticationEntryPoint((exchange, ex) -> {
@@ -106,8 +112,7 @@ public class SecurityConfig {
                         .accessDeniedHandler((exchange, ex) -> {
                             exchange.getResponse().setStatusCode(HttpStatus.FORBIDDEN);
                             return exchange.getResponse().setComplete();
-                        })
-                )
+                        }))
                 .build();
     }
 
