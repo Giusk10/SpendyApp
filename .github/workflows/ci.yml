@@ -27,6 +27,17 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Validate shell scripts, MySQL init order, and Compose config
+        env:
+          MYSQL_ROOT_PASSWORD: ci-root-password
+          MYSQL_PASSWORD: ci-shared-password
+        run: |
+          bash -n scripts/dev-up.sh scripts/smoke-test.sh
+          sh -n db/init/99-init-users.sh
+          test "$(find db/init -maxdepth 1 -type f | sort | head -n 1)" = "db/init/00-init-db.sql"
+          test "$(find db/init -maxdepth 1 -type f | sort | tail -n 1)" = "db/init/99-init-users.sh"
+          docker compose config --quiet
+
       - name: Build and Test with Maven
         run: mvn clean verify -B
 
