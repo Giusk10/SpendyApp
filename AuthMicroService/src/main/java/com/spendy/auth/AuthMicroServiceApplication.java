@@ -17,9 +17,13 @@ public class AuthMicroServiceApplication extends ResourceConfig
 
     public static void main(String[] args)
     {
-        // Carica .env dalla cartella padre (root del progetto)
+        // Carica .env dalla root del progetto (anche se avviato da sottomodulo o IDE)
+        String envDir = "./";
+        if (!new java.io.File(".env").exists() && new java.io.File("../.env").exists()) {
+            envDir = "../";
+        }
         Dotenv dotenv = Dotenv.configure()
-                .directory("./") // <--- PUNTA ALLA ROOT
+                .directory(envDir)
                 .ignoreIfMissing()
                 .load();
 

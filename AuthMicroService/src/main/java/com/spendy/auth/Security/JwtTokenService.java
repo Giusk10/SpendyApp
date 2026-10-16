@@ -371,17 +371,56 @@ public class JwtTokenService {
                         "Ephemeral key fallback is disabled (jwt.allow-ephemeral-keys=false). Please provide JWT_PRIVATE_KEY or JWT_PRIVATE_KEY_LOCATION.");
             }
 
+            // In dev / ephemeral mode, reuse existing key from keys/ if present
+            pem = readResourceContent("file:keys/private_key.pem");
+            if (pem != null && !pem.isBlank()) {
+                byte[] decoded = decodePem(pem, "PRIVATE KEY");
+                PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                return (RSAPrivateKey) kf.generatePrivate(keySpec);
+            }
+
             log.warn("WARNING: Ephemeral 2048-bit RSA key pair generated because jwt.allow-ephemeral-keys=true. " +
                     "DO NOT use this configuration in production!");
             KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
             kpg.initialize(2048);
             KeyPair kp = kpg.generateKeyPair();
             this.publicKey = (RSAPublicKey) kp.getPublic();
+            saveEphemeralKeysIfPossible(kp);
             return (RSAPrivateKey) kp.getPrivate();
         } catch (IllegalStateException ise) {
             throw ise;
         } catch (Exception e) {
             throw new IllegalStateException("Unable to load RSA private key: " + e.getMessage(), e);
+        }
+    }
+
+    private void saveEphemeralKeysIfPossible(KeyPair kp) {
+        try {
+            java.io.File keysDir = new java.io.File("keys");
+            if (!keysDir.exists() && new java.io.File("../keys").exists()) {
+                keysDir = new java.io.File("../keys");
+            } else if (!keysDir.exists()) {
+                keysDir.mkdirs();
+            }
+            if (keysDir.exists() && keysDir.isDirectory() && keysDir.canWrite()) {
+                java.io.File privFile = new java.io.File(keysDir, "private_key.pem");
+                java.io.File pubFile = new java.io.File(keysDir, "public_key.pem");
+                if (!privFile.exists()) {
+                    String privPem = "-----BEGIN PRIVATE KEY-----\n" +
+                            Base64.getMimeEncoder(64, new byte[]{'\n'}).encodeToString(kp.getPrivate().getEncoded()) +
+                            "\n-----END PRIVATE KEY-----\n";
+                    java.nio.file.Files.writeString(privFile.toPath(), privPem);
+                }
+                if (!pubFile.exists()) {
+                    String pubPem = "-----BEGIN PUBLIC KEY-----\n" +
+                            Base64.getMimeEncoder(64, new byte[]{'\n'}).encodeToString(kp.getPublic().getEncoded()) +
+                            "\n-----END PUBLIC KEY-----\n";
+                    java.nio.file.Files.writeString(pubFile.toPath(), pubPem);
+                }
+            }
+        } catch (Exception e) {
+            log.debug("Ephemeral key auto-persisting skipped: {}", e.getMessage());
         }
     }
 
@@ -393,6 +432,9 @@ public class JwtTokenService {
             String pem = publicKeyPem;
             if ((pem == null || pem.isBlank()) && publicKeyLocation != null && !publicKeyLocation.isBlank()) {
                 pem = readResourceContent(publicKeyLocation);
+            }
+            if ((pem == null || pem.isBlank()) && allowEphemeralKeys) {
+                pem = readResourceContent("file:keys/public_key.pem");
             }
             if (pem != null && !pem.isBlank()) {
                 return parsePublicKeyFromPem(pem);
@@ -416,6 +458,13 @@ public class JwtTokenService {
         }
         try {
             Resource resource = resourceLoader.getResource(location);
+            if (!resource.exists() && location.startsWith("file:") && !location.startsWith("file:/")) {
+                String rel = location.substring("file:".length());
+                Resource alt = resourceLoader.getResource("file:../" + rel);
+                if (alt.exists()) {
+                    resource = alt;
+                }
+            }
             if (!resource.exists()) {
                 return null;
             }

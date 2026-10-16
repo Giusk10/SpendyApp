@@ -302,16 +302,10 @@ public class UserAuthService {
         try {
             String pem = publicKeyPem;
             if ((pem == null || pem.isBlank()) && publicKeyLocation != null && !publicKeyLocation.isBlank()) {
-                if (resourceLoader == null) {
-                    return null;
-                }
-                Resource resource = resourceLoader.getResource(publicKeyLocation);
-                if (!resource.exists()) {
-                    return null;
-                }
-                try (InputStream is = resource.getInputStream()) {
-                    pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                }
+                pem = readResourceContent(publicKeyLocation);
+            }
+            if ((pem == null || pem.isBlank()) && (publicKeyLocation == null || publicKeyLocation.isBlank())) {
+                pem = readResourceContent("file:keys/public_key.pem");
             }
             if (pem == null || pem.isBlank()) {
                 return null;
@@ -319,6 +313,30 @@ public class UserAuthService {
             return parsePublicKeyFromPem(pem);
         } catch (Exception e) {
             log.error("Failed to load RSA public key: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private String readResourceContent(String location) {
+        if (resourceLoader == null || location == null || location.isBlank()) {
+            return null;
+        }
+        try {
+            Resource resource = resourceLoader.getResource(location);
+            if (!resource.exists() && location.startsWith("file:") && !location.startsWith("file:/")) {
+                String rel = location.substring("file:".length());
+                Resource alt = resourceLoader.getResource("file:../" + rel);
+                if (alt.exists()) {
+                    resource = alt;
+                }
+            }
+            if (!resource.exists()) {
+                return null;
+            }
+            try (InputStream is = resource.getInputStream()) {
+                return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) {
             return null;
         }
     }

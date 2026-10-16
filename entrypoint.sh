@@ -2,6 +2,20 @@
 
 echo "🚀 Avvio SpendyApp All-in-One..."
 
+# Assicura chiavi RSA condivise se non esplicitamente configurate via env
+if [ -z "$JWT_PRIVATE_KEY" ] && [ -z "$JWT_PRIVATE_KEY_LOCATION" ]; then
+    mkdir -p /app/keys
+    if [ ! -f /app/keys/private_key.pem ]; then
+        echo "🔑 Generazione automatica chiavi RSA condivise per SpendyApp..."
+        openssl genpkey -algorithm RSA -out /app/keys/private_key.pem -pkeyopt rsa_keygen_bits:2048 2>/dev/null || true
+        openssl rsa -pubout -in /app/keys/private_key.pem -out /app/keys/public_key.pem 2>/dev/null || true
+    fi
+    if [ -f /app/keys/private_key.pem ]; then
+        export JWT_PRIVATE_KEY_LOCATION="file:/app/keys/private_key.pem"
+        export JWT_PUBLIC_KEY_LOCATION="file:/app/keys/public_key.pem"
+    fi
+fi
+
 # File di log
 AUTH_LOG="/app/auth.log"
 EXPENSE_LOG="/app/expense.log"

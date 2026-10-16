@@ -44,8 +44,8 @@ public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
-    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:8080}")
-    private String corsAllowedOrigins = "http://localhost:3000,http://localhost:8080";
+    @Value("${cors.allowed-origins:http://localhost:3000,http://localhost:8080,http://localhost:7860,http://127.0.0.1:7860,http://127.0.0.1:8080,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081,http://localhost:8084,http://127.0.0.1:8084}")
+    private String corsAllowedOrigins = "http://localhost:3000,http://localhost:8080,http://localhost:7860,http://127.0.0.1:7860,http://127.0.0.1:8080,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081,http://localhost:8084,http://127.0.0.1:8084";
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -57,11 +57,16 @@ public class SecurityConfig {
                 .toList();
 
         if (origins.isEmpty()) {
-            config.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:8080"));
+            config.setAllowedOrigins(List.of(
+                    "http://localhost:3000", "http://localhost:8080", "http://localhost:7860",
+                    "http://127.0.0.1:7860", "http://127.0.0.1:8080", "http://127.0.0.1:3000",
+                    "http://localhost:8081", "http://127.0.0.1:8081", "http://localhost:8084", "http://127.0.0.1:8084"
+            ));
         } else {
             config.setAllowedOrigins(origins);
         }
 
+        config.setAllowedOriginPatterns(List.of("http://localhost:*", "http://127.0.0.1:*", "https://*.hf.space", "https://*.huggingface.co"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
         config.setExposedHeaders(List.of("Authorization"));
@@ -146,10 +151,13 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeExchange(exchange -> exchange
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .pathMatchers(HttpMethod.GET, "/", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**",
+                        .pathMatchers(HttpMethod.GET, "/", "/swagger-ui/**", "/swagger-ui.html",
+                                "/v3/api-docs", "/v3/api-docs/**",
                                 "/webjars/**", "/favicon.ico")
                         .permitAll()
-                        .pathMatchers(HttpMethod.GET, "/Auth/v3/api-docs/**", "/Expense/v3/api-docs/**").permitAll()
+                        .pathMatchers(HttpMethod.GET,
+                                "/Auth/v3/api-docs", "/Auth/v3/api-docs/**",
+                                "/Expense/v3/api-docs", "/Expense/v3/api-docs/**").permitAll()
                         .pathMatchers(HttpMethod.POST, "/Auth/rest/auth/login", "/Auth/rest/auth/register",
                                 "/Auth/rest/auth/refresh")
                         .permitAll()
@@ -178,24 +186,20 @@ public class SecurityConfig {
     private RSAPublicKey loadPublicKey(String pem, String location, boolean allowEphemeralKeys, ResourceLoader resourceLoader) {
         try {
             if ((pem == null || pem.isBlank()) && location != null && !location.isBlank()) {
-                if (resourceLoader != null) {
-                    Resource resource = resourceLoader.getResource(location);
-                    if (resource.exists()) {
-                        try (InputStream is = resource.getInputStream()) {
-                            pem = new String(is.readAllBytes(), StandardCharsets.UTF_8);
-                        }
-                    }
-                }
+                pem = readResourceContent(location, resourceLoader);
             }
             if (pem == null || pem.isBlank()) {
                 if (!allowEphemeralKeys) {
                     throw new IllegalStateException("CRITICAL SECURITY ERROR: Gateway requires an RSA public key in production " +
                             "(set JWT_PUBLIC_KEY, JWT_PUBLIC_KEY_LOCATION, or JWT_JWK_SET_URI). Ephemeral key fallback is disabled.");
                 }
-                log.warn("WARNING: No RSA public key configured for Gateway. Using an ephemeral RSA public key because jwt.allow-ephemeral-keys=true.");
-                KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-                kpg.initialize(2048);
-                return (RSAPublicKey) kpg.generateKeyPair().getPublic();
+                pem = readResourceContent("file:keys/public_key.pem", resourceLoader);
+                if (pem == null || pem.isBlank()) {
+                    log.warn("WARNING: No RSA public key configured for Gateway. Using an ephemeral RSA public key because jwt.allow-ephemeral-keys=true.");
+                    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+                    kpg.initialize(2048);
+                    return (RSAPublicKey) kpg.generateKeyPair().getPublic();
+                }
             }
             String clean = pem
                     .replace("\\n", "")
@@ -212,6 +216,30 @@ public class SecurityConfig {
             throw ise;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to load RSA public key for Gateway: " + e.getMessage(), e);
+        }
+    }
+
+    private String readResourceContent(String location, ResourceLoader resourceLoader) {
+        if (resourceLoader == null || location == null || location.isBlank()) {
+            return null;
+        }
+        try {
+            Resource resource = resourceLoader.getResource(location);
+            if (!resource.exists() && location.startsWith("file:") && !location.startsWith("file:/")) {
+                String rel = location.substring("file:".length());
+                Resource alt = resourceLoader.getResource("file:../" + rel);
+                if (alt.exists()) {
+                    resource = alt;
+                }
+            }
+            if (!resource.exists()) {
+                return null;
+            }
+            try (InputStream is = resource.getInputStream()) {
+                return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) {
+            return null;
         }
     }
 }
