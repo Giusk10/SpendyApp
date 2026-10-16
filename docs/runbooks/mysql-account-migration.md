@@ -38,9 +38,20 @@ docker compose exec -T mysql sh -c 'exec mysqldump -uroot -p"$MYSQL_ROOT_PASSWOR
 
 Verificare che il file non sia vuoto e che il backup sia conservato in un luogo sicuro.
 
-## 3. Provisioning account e grant
+## 3. Aggiornare l'ambiente del container MySQL
 
-Con i valori aggiornati in `.env`, eseguire lo script già montato nel container:
+Dopo il backup, ricreare il solo container MySQL per caricare le nuove variabili da `.env`. Il volume nominato viene mantenuto; non usare `down -v`:
+
+```sh
+docker compose up -d --force-recreate mysql
+docker compose ps mysql
+```
+
+Attendere che MySQL risulti healthy prima di continuare.
+
+## 4. Provisioning account e grant
+
+Con il container aggiornato e i valori presenti in `.env`, eseguire lo script già montato:
 
 ```sh
 docker compose exec mysql sh /docker-entrypoint-initdb.d/99-init-users.sh
@@ -51,7 +62,7 @@ Quando gli account runtime e migrator sono entrambi configurati, gli account run
 solo `SELECT/INSERT/UPDATE/DELETE`, i migrator ricevono i privilegi DDL necessari a Flyway e
 l'account condiviso `spendy` viene revocato.
 
-## 4. Riavvio e verifica
+## 5. Riavvio e verifica
 
 ```sh
 docker compose up -d --force-recreate auth-service expense-service gateway-service
