@@ -10,7 +10,13 @@ echo "🛑 SpendyApp - Arresto Ambiente Locale"
 echo "=================================================="
 
 if ! command -v docker >/dev/null 2>&1; then
-    echo "❌ Errore: Docker non risulta installato o non è presente nel PATH."
+    echo "❌ Errore: Docker non risulta installato o non è presente nel PATH." >&2
+    exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+    echo "❌ Errore: Il demone Docker non è in esecuzione o non risponde." >&2
+    echo "   Assicurati che Docker Desktop o il servizio dockerd sia avviato." >&2
     exit 1
 fi
 
@@ -19,7 +25,7 @@ if docker compose version >/dev/null 2>&1; then
 elif command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD=(docker-compose)
 else
-    echo "❌ Errore: Docker Compose non trovato."
+    echo "❌ Errore: Docker Compose non trovato." >&2
     exit 1
 fi
 
@@ -29,5 +35,5 @@ echo "Arresto e rimozione dei container della rete spendy-network..."
 
 echo ""
 echo "✅ Tutti i container sono stati arrestati."
-echo "ℹ️  I dati del database sono stati preservati nel volume 'spendy-mysql-data'."
+echo "ℹ️  I dati del database sono stati preservati nel volume persistente 'spendy-mysql-data'."
 echo "   (Per riavviare l'ambiente: ./scripts/dev-up.sh)"

@@ -40,6 +40,8 @@ Nelle impostazioni dello Space (**Settings &rarr; Variables and Secrets**), conf
 | Nome Secret | Descrizione |
 | :--- | :--- |
 | `MYSQL_PASSWORD` | Password dell'utente MySQL per accedere agli schemi `spendy_auth` e `spendy_expense`. |
+| `MYSQL_AUTH_PASSWORD` | *(Opzionale)* Password specifica per l'utente dedicato `MYSQL_AUTH_USER`. |
+| `MYSQL_EXPENSE_PASSWORD` | *(Opzionale)* Password specifica per l'utente dedicato `MYSQL_EXPENSE_USER`. |
 | `JWT_PRIVATE_KEY` | Chiave RSA privata (2048-bit PEM string) per la firma dei token in `AuthMicroService`. |
 | `JWT_PUBLIC_KEY` | Chiave RSA pubblica (2048-bit PEM string) per la validazione dei token in `Gateway` ed `Expense`. |
 
@@ -49,7 +51,9 @@ Nelle impostazioni dello Space (**Settings &rarr; Variables and Secrets**), conf
 | `ENVIRONMENT` | `production` | Attiva i controlli rigorosi di sicurezza all'avvio. |
 | `MYSQL_HOST` | `mysql.tuoprovider.com` | Hostname del database MySQL gestito o su VPS/cloud. |
 | `MYSQL_PORT` | `3306` | Porta del database MySQL. |
-| `MYSQL_USER` | `spendy` | Nome utente del database MySQL. |
+| `MYSQL_USER` | `spendy` | Nome utente condiviso (richiede solo permessi minimi DML + Flyway DDL). |
+| `MYSQL_AUTH_USER` | `spendy_auth` | *(Opzionale)* Account isolato dedicato esclusivamente a `spendy_auth`. |
+| `MYSQL_EXPENSE_USER` | `spendy_expense` | *(Opzionale)* Account isolato dedicato esclusivamente a `spendy_expense`. |
 | `MYSQL_DATABASE_AUTH` | `spendy_auth` | Nome dello schema per l'autenticazione. |
 | `MYSQL_DATABASE_EXPENSE` | `spendy_expense` | Nome dello schema per le spese. |
 | `JWT_ISSUER` | `spendy-auth` | Issuer del token JWT. |

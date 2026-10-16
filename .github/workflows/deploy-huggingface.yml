@@ -8,7 +8,7 @@ name: CD - Deploy to Hugging Face Spaces
   workflow_dispatch:
     inputs:
       force_push:
-        description: "Abilita git push --force verso Hugging Face (usare con cautela)"
+        description: "Abilita git push --force verso Hugging Face (usare con cautela per sovrascritture autorizzate)"
         required: false
         default: false
         type: boolean
@@ -21,7 +21,11 @@ jobs:
   deploy:
     name: Deploy All-in-One Space
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main') }}
+    outputs:
+      hf_username: ${{ steps.export-vars.outputs.hf_username }}
+      space_name: ${{ steps.export-vars.outputs.space_name }}
+      space_url: ${{ steps.export-vars.outputs.space_url }}
 
     steps:
       - name: Checkout repository
@@ -31,10 +35,11 @@ jobs:
           lfs: true
 
       - name: Validate Deployment Secrets
+        id: export-vars
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
-          SPACE_NAME: ${{ secrets.SPACE_NAME }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME || vars.HF_USERNAME }}
+          SPACE_NAME: ${{ secrets.SPACE_NAME || vars.SPACE_NAME }}
         run: |
           MISSING=0
           if [ -z "$HF_TOKEN" ]; then
@@ -53,40 +58,211 @@ jobs:
             echo "ℹ️  Configurare i secret mancanti in Settings -> Secrets and variables -> Actions."
             exit 1
           fi
-          echo "✅ Tutti i secret necessari per Hugging Face Spaces sono presenti."
+
+          echo "hf_username=$HF_USERNAME" >> "$GITHUB_OUTPUT"
+          echo "space_name=$SPACE_NAME" >> "$GITHUB_OUTPUT"
+          echo "space_url=https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "✅ Tutti i secret necessari per Hugging Face Spaces sono configurati."
 
       - name: Push to Hugging Face Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
-          SPACE_NAME: ${{ secrets.SPACE_NAME }}
+          HF_USERNAME: ${{ steps.export-vars.outputs.hf_username }}
+          SPACE_NAME: ${{ steps.export-vars.outputs.space_name }}
           FORCE_PUSH: ${{ github.event.inputs.force_push || 'false' }}
         run: |
-          echo "🚀 Configurazione remote per lo Space: $HF_USERNAME/$SPACE_NAME"
-          
-          # Configura credenziali in modo sicuro senza mostrare il token nei log
-          git config --global user.email "actions@github.com"
-          git config --global user.name "GitHub Actions CI/CD"
+          echo "🚀 Configurazione sincronizzazione sicura per lo Space: $HF_USERNAME/$SPACE_NAME"
           
           # Maschera il token di autenticazione nei log di GitHub Actions
           echo "::add-mask::$HF_TOKEN"
-          
-          HF_REPO_URL="https://${HF_USERNAME}:${HF_TOKEN}@huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
+
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions CI/CD"
+
+          # Configura autenticazione HTTP senza incorporare il token nell'URL del remote
+          git config --global "http.https://huggingface.co/.extraheader" "Authorization: Bearer $HF_TOKEN"
+
+          HF_REPO_URL="https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
           git remote add space "$HF_REPO_URL"
 
-          echo "📦 Sincronizzazione commit verso Hugging Face Space..."
+          echo "🔍 Verifica dello stato del repository di destinazione..."
           if [ "$FORCE_PUSH" = "true" ]; then
-            echo "⚠️ Esecuzione push forzato (--force)..."
+            echo "⚠️  Esecuzione push forzato (--force) autorizzato esplicitamente via workflow_dispatch..."
             git push --force space HEAD:refs/heads/main
+            echo "✅ Push forzato completato."
+            exit 0
+          fi
+
+          # Verifica esistenza del branch remoto
+          if ! git ls-remote --exit-code space refs/heads/main >/dev/null 2>&1; then
+            echo "📦 Branch remoto 'main' inesistente sullo Space. Inizializzazione primo push..."
+            git push space HEAD:refs/heads/main
+            echo "✅ Primo push completato con successo!"
+            exit 0
+          fi
+
+          # Fetch del branch remoto per confronto storico
+          git fetch space main
+
+          LOCAL=$(git rev-parse HEAD)
+          REMOTE=$(git rev-parse space/main)
+          BASE=$(git merge-base HEAD space/main)
+
+          if [ "$LOCAL" = "$REMOTE" ]; then
+            echo "✅ Repository Hugging Face già allineato al commit corrente ($LOCAL). Nessun push necessario."
+          elif [ "$REMOTE" = "$BASE" ]; then
+            echo "⏩ Fast-forward possibile: il commit locale è un'evoluzione diretta di quello remoto."
+            git push space HEAD:refs/heads/main
+            echo "✅ Push di avanzamento completato con successo!"
+          elif [ "$LOCAL" = "$BASE" ]; then
+            echo "❌ ERRORE: Il repository Hugging Face contiene commit più recenti ($REMOTE) non presenti in locale ($LOCAL)." >&2
+            echo "   Il deployment è stato interrotto per evitare la sovrascrittura di modifiche remote." >&2
+            echo "   Allineare il branch locale prima di procedere." >&2
+            exit 1
           else
-            # Tenta prima un push ordinario
-            if ! git push space HEAD:refs/heads/main; then
-              echo "⚠️ Push ordinario fallito (probabile divergenza remota dei metadati README.md dello Space)."
-              echo "Tento la sincronizzazione con fast-forward/rebase..."
-              git fetch space main
-              git push --force-with-lease space HEAD:refs/heads/main || git push --force space HEAD:refs/heads/main
-            fi
+            echo "❌ ERRORE CRITICO: Rilevata divergenza tra il repository GitHub e Hugging Face Spaces!" >&2
+            echo "   Base comune:       $BASE" >&2
+            echo "   Commit locale:     $LOCAL" >&2
+            echo "   Commit remoto:     $REMOTE" >&2
+            echo "   La sincronizzazione è stata bloccata senza tentare alcun force-push automatico." >&2
+            echo "   Istruzioni di risoluzione:" >&2
+            echo "     1. Eseguire fetch ed esaminare le differenze con: git log HEAD...FETCH_HEAD" >&2
+            echo "     2. Se le modifiche remote vanno conservate, integrarle nel repository locale." >&2
+            echo "     3. Se è necessario sovrascrivere intenzionalmente la storia remota, eseguire" >&2
+            echo "        il workflow manualmente con workflow_dispatch abilitando l'opzione 'force_push'." >&2
+            exit 1
           fi
 
           echo "✅ Codice sincronizzato con successo su Hugging Face Spaces!"
-          echo "   URL dello Space: https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
+          echo "   URL Repository: https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
+
+  verify-deployment:
+    name: Post-Deployment Readiness Verification
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify Space State via Hugging Face API
+        id: check-space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ needs.deploy.outputs.hf_username }}
+          SPACE_NAME: ${{ needs.deploy.outputs.space_name }}
+        run: |
+          echo "::add-mask::$HF_TOKEN"
+          echo "=================================================="
+          echo "⏳ Verifica stato infrastrutturale Space ($HF_USERNAME/$SPACE_NAME)..."
+          echo "=================================================="
+
+          MAX_WAIT=600 # 10 minuti di timeout per build container ed avvio JVM
+          INTERVAL=15
+          ELAPSED=0
+          API_URL="https://huggingface.co/api/spaces/${HF_USERNAME}/${SPACE_NAME}"
+
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            RESPONSE=$(curl -s -H "Authorization: Bearer $HF_TOKEN" "$API_URL" || true)
+
+            STAGE=$(echo "$RESPONSE" | jq -r '.runtime.stage // "UNKNOWN"' 2>/dev/null || echo "UNKNOWN")
+            HOST=$(echo "$RESPONSE" | jq -r '.host // (if .subdomain then "https://" + .subdomain + ".hf.space" else "" end)' 2>/dev/null || echo "")
+
+            echo "   [$ELAPSED/${MAX_WAIT}s] Stato Space: $STAGE"
+
+            if [ "$STAGE" = "RUNNING" ]; then
+              echo "✅ Lo Space ha completato l'avvio ed è nello stato RUNNING!"
+              
+              # Fallback determinazione dominio se API non restituisce host
+              if [ -z "$HOST" ]; then
+                CLEAN_USER=$(echo "$HF_USERNAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+                CLEAN_SPACE=$(echo "$SPACE_NAME" | tr '[:upper:]' '[:lower:]' | tr '_' '-')
+                HOST="https://${CLEAN_USER}-${CLEAN_SPACE}.hf.space"
+              fi
+              echo "target_host=$HOST" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            case "$STAGE" in
+              BUILD_ERROR|RUNTIME_ERROR|CONFIG_ERROR|STOPPED|PAUSED)
+                echo "❌ ERRORE: Lo Space è entrato in uno stato di errore non recuperabile: $STAGE" >&2
+                echo "   Consultare i log di build e runtime dello Space:" >&2
+                echo "   https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}" >&2
+                exit 1
+                ;;
+            esac
+
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          echo "❌ TIMEOUT: Lo Space non ha raggiunto lo stato RUNNING dopo ${MAX_WAIT}s." >&2
+          echo "   Log e diagnosi: https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}" >&2
+          exit 1
+
+      - name: Verify Application Readiness via Actuator Health Check
+        env:
+          TARGET_HOST: ${{ steps.check-space.outputs.target_host }}
+          HF_USERNAME: ${{ needs.deploy.outputs.hf_username }}
+          SPACE_NAME: ${{ needs.deploy.outputs.space_name }}
+        run: |
+          echo "=================================================="
+          echo "🩺 Verifica disponibilità applicativa (Readiness Check)"
+          echo "   Target Host: $TARGET_HOST"
+          echo "=================================================="
+
+          HEALTH_URL="${TARGET_HOST}/actuator/health"
+          AUTH_HEALTH_URL="${TARGET_HOST}/Auth/rest/auth/health"
+
+          MAX_WAIT=180 # 3 minuti per ingress routing e riscaldamento Spring Cloud Gateway
+          INTERVAL=5
+          ELAPSED=0
+          GATEWAY_UP=0
+
+          echo "⏳ Polling endpoint di salute Gateway: $HEALTH_URL ..."
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            # curl con timeout breve per intercettare transitori 502/503/504
+            HTTP_CODE=$(curl -s -k -o /tmp/health_body.json -w "%{http_code}" --connect-timeout 5 --max-time 10 "$HEALTH_URL" 2>/dev/null || echo "000")
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              if grep -q '"status":"UP"' /tmp/health_body.json 2>/dev/null; then
+                echo "✅ Spring Cloud Gateway ha risposto 200 OK con stato UP!"
+                GATEWAY_UP=1
+                break
+              fi
+            fi
+
+            echo "   [$ELAPSED/${MAX_WAIT}s] In attesa di risposta HTTP 200 (ultimo status: HTTP $HTTP_CODE)..."
+            sleep $INTERVAL
+            ELAPSED=$((ELAPSED + INTERVAL))
+          done
+
+          if [ $GATEWAY_UP -ne 1 ]; then
+            echo "❌ ERRORE: L'applicazione non ha risposto UP su $HEALTH_URL entro ${MAX_WAIT}s." >&2
+            echo "   Ultimo codice HTTP ricevuto: $HTTP_CODE" >&2
+            echo "   Consultare i log del container: https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}" >&2
+            exit 1
+          fi
+
+          echo "⏳ Verifica instradamento downstream su Auth Service ($AUTH_HEALTH_URL)..."
+          AUTH_CODE=$(curl -s -k -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$AUTH_HEALTH_URL" 2>/dev/null || echo "000")
+          if [ "$AUTH_CODE" = "200" ]; then
+            echo "✅ Route downstream /Auth/rest/auth/health ha risposto 200 OK!"
+          else
+            echo "⚠️  Attenzione: /Auth/rest/auth/health ha risposto HTTP $AUTH_CODE (verificare instradamento)."
+          fi
+
+      - name: Deployment Pipeline Summary
+        env:
+          HF_USERNAME: ${{ needs.deploy.outputs.hf_username }}
+          SPACE_NAME: ${{ needs.deploy.outputs.space_name }}
+          TARGET_HOST: ${{ steps.check-space.outputs.target_host }}
+        run: |
+          echo "=================================================="
+          echo "🎉 DEPLOYMENT E VERIFICA RUNTIME COMPLETATI CON SUCCESSO!"
+          echo "=================================================="
+          echo "  [✓] 1. CI completata con successo (Maven verify, test, JaCoCo)"
+          echo "  [✓] 2. Push verso Hugging Face Space completato in modo sicuro (senza force-push automatici)"
+          echo "  [✓] 3. Space avviato dall'infrastruttura (Hugging Face stage: RUNNING)"
+          echo "  [✓] 4. Applicazione pronta e raggiungibile (Gateway Actuator Health: 200 UP)"
+          echo ""
+          echo "  🌐 URL Applicazione: $TARGET_HOST"
+          echo "  📖 Swagger UI:       ${TARGET_HOST}/swagger-ui.html"
+          echo "  🚀 Dashboard Space:  https://huggingface.co/spaces/${HF_USERNAME}/${SPACE_NAME}"
+          echo "=================================================="

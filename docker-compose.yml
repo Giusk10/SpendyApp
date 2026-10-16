@@ -13,9 +13,15 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be configured in .env}
       MYSQL_USER: ${MYSQL_USER:-spendy}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD must be configured in .env}
+      MYSQL_AUTH_USER: ${MYSQL_AUTH_USER:-}
+      MYSQL_AUTH_PASSWORD: ${MYSQL_AUTH_PASSWORD:-}
+      MYSQL_EXPENSE_USER: ${MYSQL_EXPENSE_USER:-}
+      MYSQL_EXPENSE_PASSWORD: ${MYSQL_EXPENSE_PASSWORD:-}
+      MYSQL_DATABASE_AUTH: ${MYSQL_DATABASE_AUTH:-spendy_auth}
+      MYSQL_DATABASE_EXPENSE: ${MYSQL_DATABASE_EXPENSE:-spendy_expense}
     volumes:
       - mysql-data:/var/lib/mysql
-      - ./db/init/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+      - ./db/init:/docker-entrypoint-initdb.d:ro
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$${MYSQL_ROOT_PASSWORD}"]
       interval: 5s
@@ -39,8 +45,8 @@ services:
     environment:
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
-      - MYSQL_USER=${MYSQL_USER:-spendy}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_USER=${MYSQL_AUTH_USER:-${MYSQL_USER:-spendy}}
+      - MYSQL_PASSWORD=${MYSQL_AUTH_PASSWORD:-${MYSQL_PASSWORD}}
       - MYSQL_DATABASE_AUTH=${MYSQL_DATABASE_AUTH:-spendy_auth}
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}
@@ -79,8 +85,8 @@ services:
     environment:
       - MYSQL_HOST=mysql
       - MYSQL_PORT=3306
-      - MYSQL_USER=${MYSQL_USER:-spendy}
-      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_USER=${MYSQL_EXPENSE_USER:-${MYSQL_USER:-spendy}}
+      - MYSQL_PASSWORD=${MYSQL_EXPENSE_PASSWORD:-${MYSQL_PASSWORD}}
       - MYSQL_DATABASE_EXPENSE=${MYSQL_DATABASE_EXPENSE:-spendy_expense}
       - JWT_ISSUER=${JWT_ISSUER:-spendy-auth}
       - JWT_AUDIENCE=${JWT_AUDIENCE:-spendy-app}

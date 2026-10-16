@@ -6,7 +6,13 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 if ! command -v docker >/dev/null 2>&1; then
-    echo "❌ Errore: Docker non risulta installato o non è presente nel PATH."
+    echo "❌ Errore: Docker non risulta installato o non è presente nel PATH." >&2
+    exit 1
+fi
+
+if ! docker info >/dev/null 2>&1; then
+    echo "❌ Errore: Il demone Docker non è in esecuzione o non risponde." >&2
+    echo "   Assicurati che Docker Desktop o il servizio dockerd sia avviato." >&2
     exit 1
 fi
 
@@ -15,7 +21,7 @@ if docker compose version >/dev/null 2>&1; then
 elif command -v docker-compose >/dev/null 2>&1; then
     COMPOSE_CMD=(docker-compose)
 else
-    echo "❌ Errore: Docker Compose non trovato."
+    echo "❌ Errore: Docker Compose non trovato." >&2
     exit 1
 fi
 

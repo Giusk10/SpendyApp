@@ -103,3 +103,14 @@ I limiti consigliati sono:
 - `auth-service`: ~200-350 MB
 - `expense-service`: ~250-450 MB (inclusi modelli NLP)
 - `gateway-service`: ~150-250 MB
+
+### 4.4. Verifica e Manutenzione Privilegi Database
+Per controllare i privilegi attivi concessi agli utenti MySQL ed assicurarsi che rispettino il principio del minimo privilegio:
+```bash
+# Verifica privilegi dell'utente applicativo spendy
+docker compose exec -i mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" -e "SHOW GRANTS FOR 'spendy'@'%';"
+
+# Applicazione della migrazione dei privilegi a caldo su volumi esistenti (senza perdita dati)
+docker compose exec -i mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" < db/init/migrate-least-privilege.sql
+```
+

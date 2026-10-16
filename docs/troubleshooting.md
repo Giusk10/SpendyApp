@@ -143,3 +143,65 @@ Aggiungere l'origine specifica nella variabile `CORS_ALLOWED_ORIGINS` in `.env`:
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:7860,http://127.0.0.1:7860,http://localhost:5173
 ```
 Riavviare i container con `./scripts/dev-up.sh`.
+
+---
+
+## 7. Divergenza Git durante il Deploy (`CD - Deploy to Hugging Face Spaces`)
+
+### Sintomo
+Il job `deploy` della pipeline fallisce con:
+```
+❌ ERRORE CRITICO: Rilevata divergenza tra il repository GitHub e Hugging Face Spaces!
+La sincronizzazione è stata bloccata senza tentare alcun force-push automatico.
+```
+
+### Causa Probabile
+Lo Space su Hugging Face è stato modificato esternamente (ad es. modifica dei metadati o del README via interfaccia web di Hugging Face) oppure un commit precedente è stato riscritto, rendendo le storie non lineari.
+
+### Soluzione
+1. **Analisi locale delle differenze**:
+   ```bash
+   git fetch https://huggingface.co/spaces/<HF_USERNAME>/<SPACE_NAME> main
+   git log HEAD...FETCH_HEAD --oneline
+   ```
+2. **Integrazione delle modifiche**: Se i commit remoti contengono modifiche da preservare, eseguire un `merge` o `rebase` locale sul branch `main` e inviare le modifiche su GitHub con un nuovo commit.
+3. **Sovrascrittura controllata di emergenza**: Se si è certi che lo stato su GitHub debba sovrascrivere interamente lo Space remoto:
+   - Aprire GitHub &rarr; **Actions** &rarr; **CD - Deploy to Hugging Face Spaces**.
+   - Cliccare su **Run workflow** e impostare `force_push: true`.
+
+---
+
+## 8. Fallimento della Verifica Post-Deployment (`verify-deployment`)
+
+### Sintomo
+Il codice viene inviato correttamente a Hugging Face, ma il job successivo `verify-deployment` fallisce con:
+`❌ ERRORE: L'applicazione non ha risposto UP su .../actuator/health entro 180s` oppure lo Space entra in `RUNTIME_ERROR`.
+
+### Causa Probabile
+1. In produzione, mancano le chiavi `JWT_PRIVATE_KEY` o `JWT_PUBLIC_KEY` tra i secret di Hugging Face.
+2. Il database MySQL remoto non è raggiungibile dallo Space o le credenziali `MYSQL_PASSWORD` sono errate.
+3. Lo Space è ancora in fase di build lenta per indisponibilità momentanea delle risorse di calcolo.
+
+### Diagnosi e Soluzione
+1. Aprire l'URL dello Space: `https://huggingface.co/spaces/<HF_USERNAME>/<SPACE_NAME>`.
+2. Esaminare la scheda **Logs** per consultare l'output di `entrypoint.sh` e dei microservizi interni (`[Auth]`, `[Expense]`, Gateway).
+3. Correggere i secret su Hugging Face (**Settings &rarr; Variables and Secrets**) e riavviare lo Space o riattivare il workflow.
+
+---
+
+## 9. Fallimento Avvio Locale (`scripts/dev-up.sh` termina con exit code 1)
+
+### Sintomo
+Lo script `./scripts/dev-up.sh` non completa l'avvio e restituisce un errore esplicito.
+
+### Cause e Risoluzioni
+- **Demone Docker non attivo**:
+  `❌ Errore: Il demone Docker non è in esecuzione o non risponde.`
+  *Soluzione*: Avviare Docker Desktop (su macOS/Windows) o il demone `sudo systemctl start docker` (su Linux).
+- **File `.env` assente**:
+  `❌ Errore: File di configurazione .env non trovato nella radice del progetto.`
+  *Soluzione*: Eseguire `cp .env.example .env` e verificare le variabili prima di rilanciare `./scripts/dev-up.sh`.
+- **Uno o più servizi non healthy**:
+  `❌ ERRORE: Uno o più servizi essenziali non hanno raggiunto lo stato 'healthy' entro 90s!`
+  *Soluzione*: Lo script elenca il servizio specifico guasto. Eseguire `./scripts/dev-logs.sh <servizio>` per visionare l'errore puntuale (ad es. porta MySQL occupata o fallimento connessione).
+
