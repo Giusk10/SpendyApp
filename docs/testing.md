@@ -35,17 +35,17 @@ flowchart TD
 
 ## 3. Risultati della Suite di Test e Metriche di Copertura
 
-La suite di test automatizzata conta **170 test totali**, tutti superati con successo senza alcun fallimento o skip:
+La suite di test automatizzata conta **354 test totali** (163 in `AuthMicroService`, 21 in `Gateway`, 170 in `ExpenseMicroService`), tutti superati con successo senza alcun fallimento o skip:
 
 ```text
 [INFO] Reactor Summary for spendy 0.0.1-SNAPSHOT:
-[INFO] spendy ............................................. SUCCESS [ 0.447 s]
-[INFO] AuthMicroService ................................... SUCCESS [10.243 s]
-[INFO] Gateway ............................................ SUCCESS [ 4.473 s]
-[INFO] ExpenseMicroService ................................ SUCCESS [ 6.944 s]
+[INFO] spendy ............................................. SUCCESS
+[INFO] AuthMicroService ................................... SUCCESS [163 tests]
+[INFO] Gateway ............................................ SUCCESS [ 21 tests]
+[INFO] ExpenseMicroService ................................ SUCCESS [170 tests]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
-[INFO] Tests run: 170, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 354, Failures: 0, Errors: 0, Skipped: 0
 ```
 
 ### Copertura del Codice JaCoCo (Istruzioni Eseguite):
@@ -53,10 +53,10 @@ I dati estratti dai report [jacoco.csv](../ExpenseMicroService/target/site/jacoc
 
 | Modulo | Istruzioni Coperte | Istruzioni Totali | Percentuale di Copertura | Test Totali |
 | :--- | :--- | :--- | :--- | :--- |
-| **Gateway** | 539 | 733 | **73.53%** | 3 test class ([GatewaySecurityTest](../Gateway/src/test/java/com/spendy/gateway/JWT/GatewaySecurityTest.java), [SecurityConfigTest](../Gateway/src/test/java/com/spendy/gateway/JWT/SecurityConfigTest.java), [GatewayApplicationTest](../Gateway/src/test/java/com/spendy/gateway/GatewayApplicationTest.java)) |
-| **AuthMicroService** | 2.429 | 3.693 | **65.77%** | 13 test class |
-| **ExpenseMicroService** | 2.945 | 4.620 | **63.74%** | 17 test class |
-| **Totale Piattaforma** | **5.913** | **9.046** | **65.37%** | **170 test unitari e di integrazione** |
+| **Gateway** | 549 | 743 | **73.89%** | 3 test class (21 test) |
+| **AuthMicroService** | 2.427 | 3.694 | **65.70%** | 13 test class (163 test) |
+| **ExpenseMicroService** | 2.943 | 4.618 | **63.73%** | 17 test class (170 test) |
+| **Totale Piattaforma** | **5.919** | **9.055** | **65.37%** | **354 test unitari e di integrazione** |
 
 ---
 
@@ -86,30 +86,30 @@ Il codebase include test mirati alla verifica puntuale delle difese di sicurezza
 
 ### 5.1. Esecuzione Globale
 ```bash
-mvn test
+./mvnw clean test
 ```
 
 ### 5.2. Esecuzione per Singolo Modulo
 ```bash
-mvn test -pl AuthMicroService
-mvn test -pl ExpenseMicroService
-mvn test -pl Gateway
+./mvnw test -pl AuthMicroService
+./mvnw test -pl ExpenseMicroService
+./mvnw test -pl Gateway
 ```
 
 ### 5.3. Esecuzione di una Singola Classe o Metodo di Test
 ```bash
 # Esecuzione di una specifica classe di test:
-mvn test -Dtest=JwtSecurityHardeningTest
+./mvnw test -Dtest=JwtSecurityHardeningTest
 
 # Esecuzione di un singolo metodo di test:
-mvn test -Dtest=SessionSecurityHardeningTest#testRefreshTokenReuseRevokesFamily
+./mvnw test -Dtest=SessionSecurityHardeningTest#testRefreshTokenReuseRevokesFamily
 ```
 
 ---
 
 ## 6. Aree Non Coperte e Debito Tecnico dei Test
 
-Sebbene la suite unitaria e di integrazione sia solida (170 test), l'analisi del repository evidenzia le seguenti aree scoperte:
+Sebbene la suite unitaria e di integrazione sia solida (354 test), l'analisi del repository evidenzia le seguenti aree scoperte:
 1. **Test End-to-End su MySQL Reale**:
    I test di integrazione JPA correnti ([AuthJpaPersistenceIntegrationTest](../AuthMicroService/src/test/java/com/spendy/auth/Repository/AuthJpaPersistenceIntegrationTest.java) e [ExpenseJpaPersistenceIntegrationTest](../ExpenseMicroService/src/test/java/com/spendyteam/expense/Repository/ExpenseJpaPersistenceIntegrationTest.java)) si appoggiano su un database in-memory H2 configurato con alias SQL ([H2FunctionAliases.java](../ExpenseMicroService/src/test/java/com/spendyteam/expense/Utility/H2FunctionAliases.java)). Sarebbe opportuno integrare **Testcontainers** per validare le query native direttamente su un container MySQL 8.4 ufficiale.
 2. **Test di Carico e Stress Concurrent**:

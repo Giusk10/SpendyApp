@@ -63,7 +63,7 @@ La documentazione approfondita dell'intero sistema è consultabile nella directo
 | 🔌 [Specifiche API REST](docs/api.md) | Contratti di tutti gli endpoint, metodi HTTP, parametri, schemi di risposta ed esempi JSON. |
 | 🔐 [Autenticazione & Sessioni](docs/authentication.md) | Crittografia asimmetrica RS256, BCrypt, Refresh Token Rotation, hashing SHA-256 e rate limiting. |
 | 🗃️ [Modello Dati & Persistenza](docs/data-model.md) | Schemi relazionali, diagramma ER, indici e vincoli di integrità. |
-| 🧪 [Strategia di Test & JaCoCo](docs/testing.md) | Suite di oltre 170 test, integration test con database H2 in memoria e metriche JaCoCo. |
+| 🧪 [Strategia di Test & JaCoCo](docs/testing.md) | Suite di 354 test, integration test con database H2 in memoria e metriche JaCoCo. |
 | 🛡️ [Analisi di Sicurezza & Threat Model](docs/security.md) | Superfici d'attacco, mitigazione timing attack, protezione IDOR, CORS e gestione segreti. |
 | 📜 [Architecture Decision Records (ADR)](docs/decisions/0001-migrazione-mysql-flyway.md) | Decisioni architetturali motivate (MySQL, RSA RS256, Gateway reattivo, OpenNLP, Token Rotation). |
 | 📋 [Changelog Completo](CHANGELOG.md) | Cronologia ufficiale dei rilasci e commit significativi ricostruita dalla storia Git. |

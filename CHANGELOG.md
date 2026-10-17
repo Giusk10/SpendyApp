@@ -112,5 +112,5 @@ Il formato è ispirato a [Keep a Changelog](https://keepachangelog.com/it/1.1.0/
 - Strutturazione del progetto multi-modulo Maven (AuthMicroService, ExpenseMicroService, Gateway).
 - Implementazione endpoint di autenticazione di base (registrazione, login, refresh token, profilo utente).
 - Implementazione endpoint di spesa (importazione CSV, lista spese, filtri per data/mese/anno, inserimento e cancellazione).
-- Containerizzazione Docker con build multi-stage e script [entrypoint.sh](entrypoint.sh) per il deployment All-in-One.
+- Containerizzazione Docker con build multi-stage e script [entrypoint.sh](deploy/huggingface/entrypoint.sh) per il deployment All-in-One.
 - Configurazione di Spring Cloud Gateway su porta `7860` con logging reattivo Netty.
