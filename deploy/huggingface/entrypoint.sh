@@ -147,8 +147,19 @@ fi
 
 # 7. Avvio Gateway Service
 echo "--> Avvio API Gateway (Porta 7860)..."
+
+# Normalizzazione URI servizi downstream per architettura All-in-One single-container
+if [ "${AUTH_SERVICE_URI:-}" = "http://auth-service:8081" ] || [ -z "${AUTH_SERVICE_URI:-}" ]; then
+    export AUTH_SERVICE_URI="http://localhost:8081"
+fi
+if [ "${EXPENSE_SERVICE_URI:-}" = "http://expense-service:8084" ] || [ -z "${EXPENSE_SERVICE_URI:-}" ]; then
+    export EXPENSE_SERVICE_URI="http://localhost:8084"
+fi
+
 java -Xms128m -Xmx384m -XX:+UseG1GC \
      -Dserver.port=7860 \
+     -DAUTH_SERVICE_URI="$AUTH_SERVICE_URI" \
+     -DEXPENSE_SERVICE_URI="$EXPENSE_SERVICE_URI" \
      -Dreactor.netty.http.server.accessLogEnabled=true \
      -jar /app/gateway-service.jar &
 GATEWAY_PID=$!
