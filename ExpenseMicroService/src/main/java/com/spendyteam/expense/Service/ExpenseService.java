@@ -5,7 +5,12 @@ import com.spendyteam.expense.Data.Expense;
 import com.spendyteam.expense.Repository.IExpenseRepository;
 import com.spendyteam.expense.Utility.ExpenseDataParser;
 import jakarta.ws.rs.core.Response;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,25 +32,18 @@ import java.util.*;
 @Service("expenseService")
 public class ExpenseService {
 
-    @Autowired
-    private IExpenseRepository expenseRepository;
+    private static final Logger log = LoggerFactory.getLogger(ExpenseService.class);
 
-    @Autowired
-    private SmartCategorizerService smartCategorizerService;
-
-    @Autowired
-    private UserAuthService userAuthService;
-
-    @Autowired
-    private ExpenseDataParser expenseDataParser;
-
-    @Autowired
-    private ExpenseCsvParser expenseCsvParser;
-
-    @Autowired
-    private ExpenseBatchWriter expenseBatchWriter;
+    private final IExpenseRepository expenseRepository;
+    private final SmartCategorizerService smartCategorizerService;
+    private final UserAuthService userAuthService;
+    private final ExpenseDataParser expenseDataParser;
+    private final ExpenseCsvParser expenseCsvParser;
+    private final ExpenseBatchWriter expenseBatchWriter;
 
     public ExpenseService() {
+        this.expenseRepository = null;
+        this.smartCategorizerService = null;
         this.userAuthService = new UserAuthService();
         this.expenseDataParser = new ExpenseDataParser();
         this.expenseCsvParser = new ExpenseCsvParser(this.expenseDataParser, this.smartCategorizerService);
@@ -56,6 +54,8 @@ public class ExpenseService {
      * Constructor for unit tests supplying a mock {@link WebClient}.
      */
     public ExpenseService(WebClient webClient) {
+        this.expenseRepository = null;
+        this.smartCategorizerService = null;
         this.userAuthService = new UserAuthService(webClient);
         this.expenseDataParser = new ExpenseDataParser();
         this.expenseCsvParser = new ExpenseCsvParser(this.expenseDataParser, this.smartCategorizerService);
@@ -82,9 +82,17 @@ public class ExpenseService {
     }
 
     /**
-     * Imports expenses from an uploaded CSV file, executing parallel line parsing and throttled batch persistence.
+     * Imports expenses from an uploaded CSV file, executing parallel line parsing,
+     * optional duplicate filtering, and throttled batch persistence.
      */
     public Response importExpensesFromCsv(MultipartFile file, String token) throws Exception {
+        return importExpensesFromCsv(file, token, true);
+    }
+
+    /**
+     * Imports expenses with configurable deduplication check.
+     */
+    public Response importExpensesFromCsv(MultipartFile file, String token, boolean deduplicate) throws Exception {
         if (file == null || file.isEmpty()) {
             return Response.status(Response.Status.NO_CONTENT).entity("CSV file is empty.").build();
         }
@@ -95,26 +103,66 @@ public class ExpenseService {
             return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid Token").build();
         }
 
+        long startTime = System.currentTimeMillis();
+
         try {
             // Phase 1: Parsing CSV rows in parallel
             ExpenseCsvParser.CsvParseResult parseResult = expenseCsvParser.parse(file, username, this.smartCategorizerService);
 
             if (parseResult.expenses().isEmpty()) {
+                log.warn("CSV import for user '{}': 0 valid rows parsed. Parse errors: {}", username, parseResult.parseErrors());
                 return Response.status(Response.Status.BAD_REQUEST)
                         .entity("Nessuna riga valida trovata. Errori di parsing: " + parseResult.parseErrors())
                         .build();
             }
 
-            // Phase 2: Batch saving with semaphore throttling
-            long dbErrors = expenseBatchWriter.writeInBatches(this.expenseRepository, parseResult.expenses());
+            // Phase 2: Deduplication against existing records (if enabled)
+            List<Expense> toPersist = new ArrayList<>();
+            long skippedDuplicates = 0;
+            if (deduplicate && this.expenseRepository != null) {
+                for (Expense exp : parseResult.expenses()) {
+                    if (exp.getStartedDate() != null && exp.getAmount() != null && exp.getDescription() != null &&
+                            expenseRepository.existsByUsernameAndStartedDateAndAmountAndDescription(
+                                    username, exp.getStartedDate(), exp.getAmount(), exp.getDescription())) {
+                        skippedDuplicates++;
+                    } else {
+                        toPersist.add(exp);
+                    }
+                }
+            } else {
+                toPersist = parseResult.expenses();
+            }
+
+            // Phase 3: Batch saving with semaphore throttling
+            long dbErrors = toPersist.isEmpty() ? 0 : expenseBatchWriter.writeInBatches(this.expenseRepository, toPersist);
+            long persistedCount = toPersist.size() - dbErrors;
+            long durationMs = System.currentTimeMillis() - startTime;
+
+            log.info("CSV import completed for user '{}' in {}ms. Total read: {}, Valid: {}, Saved: {}, Duplicates skipped: {}, Parse errors: {}, DB errors: {}",
+                    username, durationMs, parseResult.totalRowsRead(), parseResult.expenses().size(), persistedCount, skippedDuplicates, parseResult.parseErrors(), dbErrors);
+
+            if (dbErrors > 0 && persistedCount == 0 && !toPersist.isEmpty()) {
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                        .entity(String.format("Import fallito per errori di persistenza database. Record falliti: %d", dbErrors))
+                        .build();
+            }
+
+            if (dbErrors > 0 && persistedCount > 0) {
+                return Response.status(207) // Multi-Status (partial success)
+                        .entity(String.format("Import parzialmente riuscito. Importati: %d. Errori Parsing: %d. Errori DB: %d",
+                                persistedCount, parseResult.parseErrors(), dbErrors))
+                        .build();
+            }
 
             String msg = String.format("Import completato. Importati: %d. Errori Parsing: %d. Errori DB: %d",
-                    parseResult.expenses().size() - dbErrors, parseResult.parseErrors(), dbErrors);
+                    persistedCount, parseResult.parseErrors(), dbErrors);
 
             return Response.ok(msg).build();
         } catch (IllegalArgumentException e) {
+            log.warn("CSV import validation error for user '{}': {}", username, e.getMessage());
             return Response.status(Response.Status.BAD_REQUEST).entity(e.getMessage()).build();
         } catch (Exception e) {
+            log.error("CSV import critical error for user '{}': {}", username, e.getMessage(), e);
             return Response.status(Response.Status.INTERNAL_SERVER_ERROR).entity("Critical error: " + e.getMessage()).build();
         }
     }
@@ -147,6 +195,27 @@ public class ExpenseService {
     }
 
     /**
+     * Retrieves a paginated and sorted page of expenses for the authenticated user.
+     */
+    @Transactional(readOnly = true)
+    public Response getExpensesPaged(String token, int page, int size, String sortBy, String direction) {
+        String username = getUsernameFromTokenViaRest(token);
+        if (username == null) {
+            return Response.status(Response.Status.UNAUTHORIZED).entity("Invalid or expired token.").build();
+        }
+
+        int safeSize = Math.max(1, Math.min(size, 500));
+        int safePage = Math.max(0, page);
+        Sort.Direction dir = "desc".equalsIgnoreCase(direction) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        String safeSort = (sortBy != null && !sortBy.isBlank()) ? sortBy : "startedDate";
+
+        Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by(dir, safeSort));
+        Page<Expense> expensePage = expenseRepository.findByUsername(username, pageable);
+
+        return Response.ok(expensePage).build();
+    }
+
+    /**
      * Retrieves expenses within a specific date range for the authenticated user.
      */
     @Transactional(readOnly = true)
@@ -161,6 +230,10 @@ public class ExpenseService {
             LocalDateTime parsedEnd = parseToLocalDateTime(endDate);
             if (start == null || parsedEnd == null) {
                 return Response.status(Response.Status.BAD_REQUEST).entity("Invalid date format.").build();
+            }
+
+            if (start.isAfter(parsedEnd)) {
+                return Response.status(Response.Status.BAD_REQUEST).entity("startedDate cannot be after completedDate.").build();
             }
 
             LocalDateTime end = parsedEnd.toLocalTime().equals(LocalTime.MIN)

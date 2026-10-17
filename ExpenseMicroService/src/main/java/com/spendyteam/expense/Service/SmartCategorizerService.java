@@ -4,6 +4,8 @@ import com.spendyteam.expense.Utility.ExpenseClassifier;
 import opennlp.tools.doccat.*;
 import opennlp.tools.util.*;
 import opennlp.tools.tokenize.SimpleTokenizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 
@@ -13,7 +15,9 @@ import java.nio.charset.StandardCharsets;
 @Service
 public class SmartCategorizerService {
 
-    private DoccatModel model;
+    private static final Logger log = LoggerFactory.getLogger(SmartCategorizerService.class);
+
+    private volatile DoccatModel model;
     // Nome del file previsto nelle risorse (dentro la cartella resources)
     private static final String MODEL_FILENAME = "/expense-model.bin";
     // Nome del file nel file system locale (per quando lo crei o sei in dev)
@@ -26,23 +30,24 @@ public class SmartCategorizerService {
             InputStream in = getClass().getResourceAsStream(MODEL_FILENAME);
 
             if (in != null) {
-                this.model = new DoccatModel(in);
-                in.close();
-                System.out.println("✅ Modello ML caricato dalle Risorse (Production Mode)!");
+                try (in) {
+                    this.model = new DoccatModel(in);
+                }
+                log.info("Modello ML caricato dalle Risorse (Production Mode).");
             } else {
                 // 2. SECONDA SCELTA: Carica dal File System (Per quando sei in sviluppo locale)
                 File modelFile = new File(MODEL_FILE_LOCAL);
                 if (modelFile.exists()) {
                     try (InputStream fileIn = new FileInputStream(modelFile)) {
                         this.model = new DoccatModel(fileIn);
-                        System.out.println("⚠️ Modello ML caricato da File System locale (Dev Mode).");
+                        log.info("Modello ML caricato da File System locale (Dev Mode).");
                     }
                 } else {
-                    System.out.println("❌ Nessun modello trovato. Il sistema userà la classificazione manuale.");
+                    log.warn("Nessun modello trovato in risorse o filesystem. Il sistema userà la classificazione manuale.");
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("Impossibile caricare il modello NLP categorizer: {}", e.getMessage(), e);
         }
     }
 

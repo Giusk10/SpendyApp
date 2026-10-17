@@ -28,8 +28,16 @@ import java.util.Map;
 @RequestMapping("/rest/expense")
 public class ExpenseController {
 
+    private final ExpenseService expenseService;
+
+    public ExpenseController() {
+        this.expenseService = null;
+    }
+
     @Autowired
-    private ExpenseService expenseService;
+    public ExpenseController(ExpenseService expenseService) {
+        this.expenseService = expenseService;
+    }
 
     private String extractBearerToken(String authHeader) {
         if (authHeader == null || !authHeader.startsWith("Bearer ") || authHeader.length() <= 7) {
@@ -65,6 +73,8 @@ public class ExpenseController {
     public ResponseEntity<String> importCsv(
         @Parameter(description = "CSV file to import", required = true)
         @RequestParam("file") MultipartFile file,
+        @Parameter(description = "Whether to skip duplicate transactions based on date, amount, and description (defaults to true)")
+        @RequestParam(value = "deduplicate", defaultValue = "true", required = false) boolean deduplicate,
         @Parameter(
             name = "Authorization",
             description = "JWT Bearer access token formatted as 'Bearer <token>'",
@@ -79,7 +89,7 @@ public class ExpenseController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
         }
         try {
-            Response res = expenseService.importExpensesFromCsv(file, token);
+            Response res = deduplicate ? expenseService.importExpensesFromCsv(file, token) : expenseService.importExpensesFromCsv(file, token, false);
             if (res.getStatus() == 200) {
                 return ResponseEntity.ok(res.getEntity().toString());
             } else {
@@ -90,9 +100,16 @@ public class ExpenseController {
         }
     }
 
+    /**
+     * Backward-compatible overload for programmatic and test invocation.
+     */
+    public ResponseEntity<String> importCsv(MultipartFile file, String authHeader) {
+        return importCsv(file, true, authHeader);
+    }
+
     @Operation(
-        summary = "Get all expenses",
-        description = "Retrieves all expense records associated with the authenticated user.",
+        summary = "Get all expenses or paginated page",
+        description = "Retrieves all expense records or a paginated page associated with the authenticated user.",
         security = @SecurityRequirement(name = "bearerAuth")
     )
     @ApiResponses({
@@ -114,6 +131,14 @@ public class ExpenseController {
     })
     @GetMapping(value = "/getExpenses", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getExpenses(
+        @Parameter(description = "Zero-based page index (optional)")
+        @RequestParam(value = "page", required = false) Integer page,
+        @Parameter(description = "The size of the page to be returned (optional, max 500)")
+        @RequestParam(value = "size", required = false) Integer size,
+        @Parameter(description = "Sorting criteria property (defaults to 'startedDate')")
+        @RequestParam(value = "sortBy", required = false, defaultValue = "startedDate") String sortBy,
+        @Parameter(description = "Sorting direction: asc or desc (defaults to 'asc')")
+        @RequestParam(value = "direction", required = false, defaultValue = "asc") String direction,
         @Parameter(
             name = "Authorization",
             description = "JWT Bearer access token formatted as 'Bearer <token>'",
@@ -128,7 +153,12 @@ public class ExpenseController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired token.");
         }
         try {
-            Response res = expenseService.getExpenses(token);
+            Response res;
+            if (page != null && size != null) {
+                res = expenseService.getExpensesPaged(token, page, size, sortBy, direction);
+            } else {
+                res = expenseService.getExpenses(token);
+            }
             if (res.getStatus() == 200) {
                 return ResponseEntity.ok().body(res.getEntity());
             } else {
@@ -139,6 +169,13 @@ public class ExpenseController {
                 java.util.Collections.singletonMap("error", "Failed to retrieve expenses: " + e.getMessage())
             );
         }
+    }
+
+    /**
+     * Backward-compatible overload for programmatic and test invocation.
+     */
+    public ResponseEntity<?> getExpenses(String authHeader) {
+        return getExpenses(null, null, "startedDate", "asc", authHeader);
     }
 
     @Operation(

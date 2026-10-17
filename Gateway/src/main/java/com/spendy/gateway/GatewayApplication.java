@@ -17,6 +17,8 @@ import reactor.core.publisher.Mono;
 @SpringBootApplication(scanBasePackages = "com.spendy.gateway")
 public class GatewayApplication {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(GatewayApplication.class);
+
     public static void main(String[] args) {
 
         // Carica .env dalla root del progetto (anche se avviato da sottomodulo o IDE)
@@ -29,11 +31,11 @@ public class GatewayApplication {
                 .ignoreIfMissing()
                 .load();
 
-        // Stampa di debug per verificare configurazione
+        // Log di avvio per verificare configurazione
         if (dotenv.get("JWT_ISSUER") == null && dotenv.get("AUTH_SERVICE_URI") == null) {
-            System.out.println("ℹ️ Configurazione .env non trovata o parziale, verranno usati i default di applicazione.");
+            log.info("Configurazione .env non trovata o parziale, verranno usati i default di applicazione.");
         } else {
-            System.out.println("✅ .env caricato correttamente per Gateway.");
+            log.info(".env caricato correttamente per Gateway.");
         }
 
         dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));

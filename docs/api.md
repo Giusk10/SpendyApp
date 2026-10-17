@@ -212,26 +212,48 @@ Classe Controller: [ExpenseController.java](../ExpenseMicroService/src/main/java
 *Tutti gli endpoint delle spese richiedono l'header `Authorization: Bearer <accessToken>`.*
 
 ### 4.1. Importazione Estratto Conto CSV
-Importa un file CSV bancario, ne analizza le righe concorrentemente con Virtual Threads, categorizza le spese via OpenNLP e le persiste a blocchi.
+Importa un file CSV bancario, ne analizza le righe concorrentemente con Virtual Threads, categorizza le spese via OpenNLP e le persiste a blocchi controllati.
 - **Metodo**: `POST`
 - **Path**: `/Expense/rest/expense/import`
 - **Content-Type**: `multipart/form-data`
 - **Autenticazione**: Richiesta (`Bearer <accessToken>`)
+- **Query Parameters (Opzionali)**:
+  - `deduplicate`: `true` (default) o `false`. Se attivo, controlla e scarta automaticamente duplicati esatti (`username + startedDate + amount + description`) già presenti nel database.
 - **Form Data**:
-  - `file`: allegato file CSV (dimensione massima configurata: 10 MB).
+  - `file`: allegato file CSV (dimensione massima configurata: 10 MB, limite configurabile: 50.000 righe).
+- **Header di Tracciamento**:
+  - `X-Correlation-ID`: se fornito dal client o iniettato dal Gateway, viene propagato nel contesto MDC e restituito negli header di risposta per la correlazione dei log distribuiti.
 - **Risposte**:
-  - `200 OK`: `"Import completato. Importati: 142. Errori Parsing: 0. Errori DB: 0"`
-  - `204 No Content`: `"CSV file is empty."`
-  - `400 Bad Request`: `"Nessuna riga valida trovata"` o errore di formato header
-  - `401 Unauthorized`: `"Invalid or expired token."`
+  - `200 OK`: Tutti i record validi sono stati salvati con successo.
+    ```json
+    {
+      "status": 200,
+      "message": "Import completato. Importati: 142. Errori Parsing: 0. Errori DB: 0",
+      "rowsRead": 142,
+      "rowsValid": 142,
+      "rowsDiscarded": 0,
+      "rowsPersisted": 142,
+      "rowsFailed": 0,
+      "timestamp": "2026-10-17T22:30:00"
+    }
+    ```
+  - `207 Multi-Status`: Importazione parziale. Uno o più batch di scrittura a database sono falliti (o violazioni di vincoli), ma una porzione delle righe è stata salvata con successo.
+  - `204 No Content`: File CSV vuoto (`CSV file is empty.`).
+  - `400 Bad Request`: Superamento limiti (dimensione > 10MB o righe > 50.000), o CSV privo di righe valide con dettaglio errori strutturato.
+  - `401 Unauthorized`: Token Bearer non valido o scaduto.
+  - `500 Internal Server Error`: Fallimento totale di tutti i batch di persistenza sul database (politica esplicita anti-falsi positivi).
 
-### 4.2. Lista di Tutte le Spese dell'Utente
-Restituisce tutte le transazioni registrate per l'utente autenticato, ordinate cronologicamente per data d'inizio crescente.
+### 4.2. Lista di Tutte le Spese dell'Utente (con supporto Paginazione)
+Restituisce le transazioni registrate per l'utente autenticato, con ordinamento deterministico per data d'inizio decrescente.
 - **Metodo**: `GET`
 - **Path**: `/Expense/rest/expense/getExpenses`
 - **Autenticazione**: Richiesta (`Bearer <accessToken>`)
+- **Query Parameters (Opzionali per Paginazione)**:
+  - `page`: numero di pagina 0-indexed (default: `0`).
+  - `size`: numero di elementi per pagina (default: `50`, limite massimo di sicurezza: `500`).
+  - *Nota*: Se i parametri `page` e `size` non vengono forniti, l'endpoint mantiene la compatibilità retroattiva applicando la prima pagina con dimensione predefinita di 50 elementi.
 - **Risposte**:
-  - `200 OK`:
+  - `200 OK`: Lista JSON delle entità `Expense` (ordinamento deterministico per `startedDate` decrescente, poi `id`).
     ```json
     [
       {
@@ -250,8 +272,8 @@ Restituisce tutte le transazioni registrate per l'utente autenticato, ordinate c
       }
     ]
     ```
-  - `204 No Content`: Nessuna spesa presente
-  - `401 Unauthorized`: Token non valido o scaduto
+  - `204 No Content`: Nessuna spesa presente.
+  - `401 Unauthorized`: Token non valido o scaduto.
 
 ### 4.3. Filtro Spese per Intervallo Date
 - **Metodo**: `POST`

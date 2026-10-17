@@ -246,7 +246,7 @@ Tutte le chiamate dall'esterno devono essere inviate verso l'**API Gateway**:
 | Metodo | Endpoint | Descrizione |
 | :--- | :--- | :--- |
 | `POST` | `/Expense/rest/expense/import` | Importazione estratto conto CSV in parallelo con auto-categorizzazione AI. |
-| `GET` | `/Expense/rest/expense/getExpenses` | Lista completa delle spese dell'utente ordinate per data crescente. |
+| `GET` | `/Expense/rest/expense/getExpenses` | Lista delle spese dell'utente (ordinamento cronologico deterministico, supporto parametri di paginazione `page` e `size`). |
 | `POST` | `/Expense/rest/expense/getExpenseByDate` | Ricerca spese comprese tra `startedDate` e `completedDate`. |
 | `POST` | `/Expense/rest/expense/getExpenseByMonth` | Filtro spese per mese (`month`) e anno (`year`). |
 | `POST` | `/Expense/rest/expense/getMonthlyAmountOfYear` | Aggregazione totale spese mese per mese per un dato anno (`year`). |
@@ -294,7 +294,7 @@ Per arrestare i servizi preservando i dati nel volume MySQL:
 
 ## 🧪 Esecuzione dei Test e Build Maven
 
-La suite comprende **354 test** automatizzati unitari, di sicurezza e di integrazione (163 in `AuthMicroService`, 21 in `Gateway`, 170 in `ExpenseMicroService` con database H2 in memoria):
+La suite comprende **382 test** automatizzati unitari, di sicurezza, di integrazione e benchmark prestazionali (164 in `AuthMicroService`, 23 in `Gateway`, 195 in `ExpenseMicroService` con database H2 in memoria):
 
 ```bash
 # Esecuzione di tutti i test (tramite Maven Wrapper)

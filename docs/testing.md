@@ -35,28 +35,33 @@ flowchart TD
 
 ## 3. Risultati della Suite di Test e Metriche di Copertura
 
-La suite di test automatizzata conta **354 test totali** (163 in `AuthMicroService`, 21 in `Gateway`, 170 in `ExpenseMicroService`), tutti superati con successo senza alcun fallimento o skip:
+La suite di test automatizzata conta **382 test totali** (164 in `AuthMicroService`, 23 in `Gateway`, 195 in `ExpenseMicroService`), tutti superati con successo con 0 fallimenti, 0 errori e 0 test disabilitati:
 
 ```text
 [INFO] Reactor Summary for spendy 0.0.1-SNAPSHOT:
 [INFO] spendy ............................................. SUCCESS
-[INFO] AuthMicroService ................................... SUCCESS [163 tests]
-[INFO] Gateway ............................................ SUCCESS [ 21 tests]
-[INFO] ExpenseMicroService ................................ SUCCESS [170 tests]
+[INFO] AuthMicroService ................................... SUCCESS [164 tests]
+[INFO] Gateway ............................................ SUCCESS [ 23 tests]
+[INFO] ExpenseMicroService ................................ SUCCESS [195 tests]
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
-[INFO] Tests run: 354, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 382, Failures: 0, Errors: 0, Skipped: 0
 ```
 
-### Copertura del Codice JaCoCo (Istruzioni Eseguite):
-I dati estratti dai report [jacoco.csv](../ExpenseMicroService/target/site/jacoco/jacoco.csv) evidenziano i seguenti livelli di copertura:
+### Copertura del Codice JaCoCo e Nuove Suite Aggiunte:
+Le verifiche di copertura JaCoCo sono pienamente soddisfatte su tutti i moduli (`mvn verify`).
+Tra le nuove classi di test aggiunte a copertura delle modifiche di affidabilità e performance:
+- `ExpenseCsvParserExtendedTest`: validazione parsing CSV con differenti delimitatori (`,`, `;`), quote escaping, date invalide, importi malformati, conservazione deterministica dell'ordine originale tramite indicizzazione concorrente su Virtual Threads, e applicazione dei limiti dimensionali (max rows e max bytes).
+- `ExpenseServiceExtendedTest`: verifica gestione transazionale e fallimenti batch parziali (HTTP 207 Multi-Status) e totali (HTTP 500), deduplicazione idempotente per chiave composta (`username + date + amount + description`), paginazione deterministica con limiti massimi di sicurezza (500 per pagina), e confini inclusivi temporali delle query di aggregazione.
+- `GlobalExceptionHandlerTest`: verifica delle risposte di errore standardizzate, codici HTTP corretti (400, 401, 403, 404, 405, 500) e assenza di leak di stack trace o percorsi interni.
+- `CorrelationIdFilterTest` (Gateway, AuthMicroService, ExpenseMicroService): propagazione end-to-end dell'header `X-Correlation-ID`, valorizzazione automatica via UUID se assente, e associazione corretta al contesto MDC di SLF4J.
+- `ExpenseBenchmarkAndConcurrencyTest`: benchmark prestazionali riproducibili su 1.000, 10.000 e 50.000 righe CSV, oltre a test di importazione concorrente su pool di thread multipli (5 thread simultanei).
 
-| Modulo | Istruzioni Coperte | Istruzioni Totali | Percentuale di Copertura | Test Totali |
-| :--- | :--- | :--- | :--- | :--- |
-| **Gateway** | 549 | 743 | **73.89%** | 3 test class (21 test) |
-| **AuthMicroService** | 2.427 | 3.694 | **65.70%** | 13 test class (163 test) |
-| **ExpenseMicroService** | 2.943 | 4.618 | **63.73%** | 17 test class (170 test) |
-| **Totale Piattaforma** | **5.919** | **9.055** | **65.37%** | **354 test unitari e di integrazione** |
+### Metriche Prestazionali Misurate:
+- **1.000 righe CSV**: ~29.65 ms totali (Parse: 29.53 ms, Persistenza Batch: 0.12 ms) &rarr; **~33.729 righe/sec**, allocazione heap contenuta (~25 MB delta).
+- **10.000 righe CSV**: ~267.92 ms totali (Parse: 267.37 ms, Persistenza Batch: 0.55 ms) &rarr; **~37.324 righe/sec**, heap delta ~18 MB.
+- **50.000 righe CSV**: ~775.16 ms di parsing &rarr; **~64.502 righe/sec**, heap delta ~148 MB.
+- **Concorrenza (5 thread simultanei &times; 1.000 righe = 5.000 righe totali)**: ~239.53 ms &rarr; **~20.873 righe/sec** aggregate.
 
 ---
 

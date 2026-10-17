@@ -2,6 +2,8 @@ package com.spendyteam.expense.Service;
 
 import com.spendyteam.expense.Data.Expense;
 import com.spendyteam.expense.Repository.IExpenseRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +21,8 @@ import java.util.concurrent.atomic.LongAdder;
 @Component
 public class ExpenseBatchWriter {
 
+    private static final Logger log = LoggerFactory.getLogger(ExpenseBatchWriter.class);
+
     /**
      * Static semaphore shared across all instances and requests to limit concurrent MySQL batch writes to 10.
      */
@@ -28,6 +32,21 @@ public class ExpenseBatchWriter {
      * Batch size for chunked persistence.
      */
     public static final int BATCH_SIZE = 500;
+
+    /**
+     * Structured summary of a batch persistence operation.
+     */
+    public record BatchWriteSummary(long totalSubmitted, long persistedCount, long failedCount) {
+        public boolean isFullSuccess() {
+            return failedCount == 0 && totalSubmitted > 0;
+        }
+        public boolean isPartialSuccess() {
+            return persistedCount > 0 && failedCount > 0;
+        }
+        public boolean isCompleteFailure() {
+            return persistedCount == 0 && totalSubmitted > 0;
+        }
+    }
 
     private final IExpenseRepository defaultRepository;
 
@@ -48,6 +67,18 @@ public class ExpenseBatchWriter {
      */
     public long writeInBatches(List<Expense> expenses) {
         return writeInBatches(this.defaultRepository, expenses);
+    }
+
+    /**
+     * Writes expenses in batches to the provided repository with structured summary.
+     */
+    public BatchWriteSummary writeInBatchesWithSummary(IExpenseRepository repository, List<Expense> expenses) {
+        if (expenses == null || expenses.isEmpty()) {
+            return new BatchWriteSummary(0, 0, 0);
+        }
+        long failed = writeInBatches(repository, expenses);
+        long persisted = expenses.size() - failed;
+        return new BatchWriteSummary(expenses.size(), persisted, failed);
     }
 
     /**
@@ -81,9 +112,13 @@ public class ExpenseBatchWriter {
                         } finally {
                             DB_WRITE_SEMAPHORE.release();
                         }
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        dbErrors.add(batch.size());
+                        log.error("Batch write interrupted while waiting for semaphore permit: {}", ie.getMessage());
                     } catch (Exception e) {
                         dbErrors.add(batch.size());
-                        System.err.println("Batch write failed: " + e.getMessage());
+                        log.error("Batch write failed for {} records: {}", batch.size(), e.getMessage());
                     }
                 });
             }

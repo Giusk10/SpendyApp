@@ -6,7 +6,10 @@ import com.opencsv.CSVReader;
 import com.opencsv.CSVReaderBuilder;
 import com.spendyteam.expense.Data.Expense;
 import com.spendyteam.expense.Utility.ExpenseDataParser;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,6 +29,14 @@ import java.util.concurrent.atomic.LongAdder;
 @Component
 public class ExpenseCsvParser {
 
+    private static final Logger log = LoggerFactory.getLogger(ExpenseCsvParser.class);
+
+    @Value("${app.csv.max-rows:50000}")
+    private int maxRows = 50000;
+
+    @Value("${app.csv.max-file-size-bytes:10485760}")
+    private long maxFileSizeBytes = 10 * 1024 * 1024; // 10MB default
+
     private final ExpenseDataParser dataParser;
     private final SmartCategorizerService categorizerService;
 
@@ -42,9 +53,42 @@ public class ExpenseCsvParser {
     }
 
     /**
-     * DTO containing parsed expenses and count of rows that produced parsing errors.
+     * Details about an individual row parse failure.
      */
-    public record CsvParseResult(List<Expense> expenses, long parseErrors) {
+    public record CsvRowError(int lineNumber, String message) {
+    }
+
+    /**
+     * DTO containing parsed expenses, count of rows with parsing errors, structured error details, and total rows read.
+     */
+    public record CsvParseResult(
+            List<Expense> expenses,
+            long parseErrors,
+            List<CsvRowError> errorDetails,
+            long totalRowsRead) {
+
+        public CsvParseResult(List<Expense> expenses, long parseErrors) {
+            this(expenses, parseErrors, Collections.emptyList(), (expenses != null ? expenses.size() : 0) + parseErrors);
+        }
+    }
+
+    private record IndexedExpense(int lineNumber, Expense expense) {
+    }
+
+    public int getMaxRows() {
+        return maxRows;
+    }
+
+    public void setMaxRows(int maxRows) {
+        this.maxRows = maxRows;
+    }
+
+    public long getMaxFileSizeBytes() {
+        return maxFileSizeBytes;
+    }
+
+    public void setMaxFileSizeBytes(long maxFileSizeBytes) {
+        this.maxFileSizeBytes = maxFileSizeBytes;
     }
 
     /**
@@ -63,6 +107,12 @@ public class ExpenseCsvParser {
      * Parses a CSV {@link MultipartFile} with an explicit categorizer service instance.
      */
     public CsvParseResult parse(MultipartFile file, String username, SmartCategorizerService categorizer) throws Exception {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("No header.");
+        }
+        if (file.getSize() > maxFileSizeBytes) {
+            throw new IllegalArgumentException(String.format("File size (%d bytes) exceeds the maximum allowed limit of %d bytes.", file.getSize(), maxFileSizeBytes));
+        }
         return parse(file.getInputStream(), username, categorizer);
     }
 
@@ -74,7 +124,7 @@ public class ExpenseCsvParser {
 
         try (BufferedReader br = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
             String headerLine = br.readLine();
-            if (headerLine == null) {
+            if (headerLine == null || headerLine.trim().isEmpty()) {
                 throw new IllegalArgumentException("No header.");
             }
 
@@ -85,28 +135,59 @@ public class ExpenseCsvParser {
             try (CSVReader reader = new CSVReaderBuilder(br).withCSVParser(parser).build()) {
                 Map<String, Integer> idx = mapHeaderToIndex(header);
 
-                ConcurrentLinkedQueue<Expense> parsedExpenses = new ConcurrentLinkedQueue<>();
+                ConcurrentLinkedQueue<IndexedExpense> parsedExpenses = new ConcurrentLinkedQueue<>();
+                ConcurrentLinkedQueue<CsvRowError> errorDetails = new ConcurrentLinkedQueue<>();
                 LongAdder parseErrors = new LongAdder();
 
-                // Phase 1: Parallel parsing using Virtual Threads (CPU bound)
+                int rowsRead = 0;
+
+                // Phase 1: Parallel parsing using Virtual Threads preserving original row order
                 try (var parserExecutor = Executors.newVirtualThreadPerTaskExecutor()) {
                     String[] line;
                     while ((line = reader.readNext()) != null) {
-                        String[] finalLine = line;
+                        rowsRead++;
+                        if (rowsRead > maxRows) {
+                            throw new IllegalArgumentException(String.format("CSV row count exceeds maximum allowed limit of %d rows.", maxRows));
+                        }
+                        final int currentLineNum = rowsRead + 1;
+                        final String[] finalLine = line;
+
                         parserExecutor.submit(() -> {
                             try {
+                                boolean empty = true;
+                                for (String col : finalLine) {
+                                    if (col != null && !col.trim().isEmpty()) {
+                                        empty = false;
+                                        break;
+                                    }
+                                }
+                                if (empty) {
+                                    return;
+                                }
+
                                 Expense expense = parseLineToExpense(finalLine, idx, username, effectiveCategorizer);
                                 if (expense != null) {
-                                    parsedExpenses.add(expense);
+                                    parsedExpenses.add(new IndexedExpense(currentLineNum, expense));
                                 }
                             } catch (Exception e) {
                                 parseErrors.increment();
+                                errorDetails.add(new CsvRowError(currentLineNum, e.getMessage() != null ? e.getMessage() : "Parsing error"));
+                                log.debug("CSV parse error at line {}: {}", currentLineNum, e.getMessage());
                             }
                         });
                     }
                 } // Await completion of all line parsing tasks
 
-                return new CsvParseResult(new ArrayList<>(parsedExpenses), parseErrors.sum());
+                List<Expense> sortedExpenses = parsedExpenses.stream()
+                        .sorted(Comparator.comparingInt(IndexedExpense::lineNumber))
+                        .map(IndexedExpense::expense)
+                        .toList();
+
+                List<CsvRowError> sortedErrors = errorDetails.stream()
+                        .sorted(Comparator.comparingInt(CsvRowError::lineNumber))
+                        .toList();
+
+                return new CsvParseResult(new ArrayList<>(sortedExpenses), parseErrors.sum(), sortedErrors, rowsRead);
             }
         }
     }

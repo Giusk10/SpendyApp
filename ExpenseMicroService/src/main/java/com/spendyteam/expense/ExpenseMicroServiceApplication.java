@@ -6,6 +6,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
 public class ExpenseMicroServiceApplication {
+
+	private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(ExpenseMicroServiceApplication.class);
+
 	public static void main(String[] args) {
 
 		// Carica .env dalla root del progetto (anche se avviato da sottomodulo o IDE)
@@ -18,11 +21,11 @@ public class ExpenseMicroServiceApplication {
 				.ignoreIfMissing()
 				.load();
 
-		// Stampa di debug per verificare configurazione database
+		// Log di avvio per verificare configurazione database
 		if (dotenv.get("SPRING_DATASOURCE_URL") == null && dotenv.get("MYSQL_HOST") == null && dotenv.get("MYSQL_USER") == null) {
-			System.out.println("ℹ️ Configurazione MySQL da variabili di default/application.properties");
+			log.info("Configurazione MySQL da variabili di default/application.properties");
 		} else {
-			System.out.println("✅ .env caricato correttamente. Configurazione database trovata.");
+			log.info(".env caricato correttamente. Configurazione database trovata.");
 		}
 
 		dotenv.entries().forEach(entry -> System.setProperty(entry.getKey(), entry.getValue()));

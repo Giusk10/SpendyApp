@@ -25,6 +25,10 @@ public interface IExpenseRepository extends JpaRepository<Expense, String> {
 
     boolean existsByUsernameAndDescriptionAndAmount(String username, String description, BigDecimal amount);
 
+    boolean existsByUsernameAndStartedDateAndAmountAndDescription(
+        String username, LocalDateTime startedDate, BigDecimal amount, String description
+    );
+
     List<Expense> findByUsername(String username, Sort sort);
 
     List<Expense> findByUsername(String username);
@@ -42,13 +46,23 @@ public interface IExpenseRepository extends JpaRepository<Expense, String> {
     @Query("SELECT e FROM Expense e WHERE e.username = :username " +
            "AND e.startedDate IS NOT NULL AND e.completedDate IS NOT NULL " +
            "AND e.startedDate >= :start AND e.completedDate <= :end " +
-           "AND e.startedDate < :end AND e.completedDate > :start " +
            "AND e.amount IS NOT NULL " +
            "ORDER BY e.startedDate ASC")
     List<Expense> findExpensesByDateRange(
         @Param("username") String username,
         @Param("start") LocalDateTime start,
         @Param("end") LocalDateTime end
+    );
+
+    @Query("SELECT e FROM Expense e WHERE e.username = :username " +
+           "AND e.startedDate IS NOT NULL AND e.completedDate IS NOT NULL " +
+           "AND e.startedDate >= :start AND e.completedDate <= :end " +
+           "AND e.amount IS NOT NULL")
+    Page<Expense> findExpensesByDateRange(
+        @Param("username") String username,
+        @Param("start") LocalDateTime start,
+        @Param("end") LocalDateTime end,
+        Pageable pageable
     );
 
     /**
@@ -63,7 +77,6 @@ public interface IExpenseRepository extends JpaRepository<Expense, String> {
                    "WHERE e.username = :username " +
                    "AND e.started_date IS NOT NULL AND e.completed_date IS NOT NULL " +
                    "AND e.started_date >= :start AND e.completed_date <= :end " +
-                   "AND e.started_date < :end AND e.completed_date > :start " +
                    "AND e.amount IS NOT NULL " +
                    "AND e.amount <= 0 " +
                    "GROUP BY DATE_FORMAT(e.started_date, '%Y-%m') " +

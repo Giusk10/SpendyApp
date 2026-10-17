@@ -3,27 +3,30 @@ package com.spendyteam.expense.Training;
 import opennlp.tools.doccat.*;
 import opennlp.tools.util.*;
 import opennlp.tools.tokenize.SimpleTokenizer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 
 public class ExpenseModelTrainer {
 
+    private static final Logger log = LoggerFactory.getLogger(ExpenseModelTrainer.class);
     private static final String MODEL_FILE = "ExpenseMicroService/src/main/resources/expense-model.bin";
     private static final String TRAINING_FILE = "ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/dataset.txt";
 
     public static void main(String[] args) {
-        System.out.println("🚀 Avvio Training Modello Spese da FILE...");
+        log.info("Avvio Training Modello Spese da FILE...");
 
         try {
             File trainingFile = new File(TRAINING_FILE);
 
             if (!trainingFile.exists()) {
-                System.err.println("❌ ERRORE: Il file '" + TRAINING_FILE + "' non esiste!");
+                log.error("Il file '{}' non esiste!", TRAINING_FILE);
                 return;
             }
 
-            System.out.println("📂 Lettura dati da: " + trainingFile.getAbsolutePath());
+            log.info("Lettura dati da: {}", trainingFile.getAbsolutePath());
 
             InputStreamFactory dataIn = new MarkableFileInputStreamFactory(trainingFile);
 
@@ -57,15 +60,15 @@ public class ExpenseModelTrainer {
                 params.put(TrainingParameters.CUTOFF_PARAM, 0);
 
                 DoccatModel model = DocumentCategorizerME.train("it", sampleStream, params, new DoccatFactory());
-                System.out.println("✅ Training completato!");
+                log.info("Training completato con successo!");
 
                 try (OutputStream modelOut = new BufferedOutputStream(new FileOutputStream(MODEL_FILE))) {
                     model.serialize(modelOut);
-                    System.out.println("💾 Modello salvato in: " + new File(MODEL_FILE).getAbsolutePath());
+                    log.info("Modello salvato in: {}", new File(MODEL_FILE).getAbsolutePath());
                 }
 
                 // Test
-                System.out.println("\n--- 🧪 TEST DEL MODELLO ---");
+                log.info("--- TEST DEL MODELLO ---");
                 testModel(model, "PAGAMENTO POS MC DONALDS");
                 testModel(model, "ADDEBITO NETFLIX COM");
                 testModel(model, "BENZINAIO IP MATTEI");
@@ -75,7 +78,7 @@ public class ExpenseModelTrainer {
             }
 
         } catch (IOException e) {
-            e.printStackTrace();
+            log.error("Errore durante il training del modello NLP: {}", e.getMessage(), e);
         }
     }
 
@@ -88,7 +91,7 @@ public class ExpenseModelTrainer {
         int index = myCategorizer.getIndex(category);
         double confidence = outcomes[index];
 
-        System.out.printf("Input: '%-25s' -> Categoria: %-30s (Sicurezza: %.2f%%)\n",
-                descrizione, category.replace("_", " "), confidence * 100);
+        log.info("Input: '{}' -> Categoria: {} (Sicurezza: {}%)",
+                descrizione, category.replace("_", " "), String.format("%.2f", confidence * 100));
     }
 }
