@@ -23,11 +23,11 @@ Era necessario implementare un motore di categorizzazione automatica in grado di
 È stata adottata una **strategia di intelligenza ibrida a doppio livello** all'interno di `ExpenseMicroService`:
 
 1. **Livello Primario: Modello Machine Learning Apache OpenNLP (MaxEnt)**:
-   - Implementato in [SmartCategorizerService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/SmartCategorizerService.java).
-   - Utilizza l'algoritmo di classificazione a Massima Entropia (`DocumentCategorizerME`) addestrato tramite [ExpenseModelTrainer.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/ExpenseModelTrainer.java) su dataset di transazioni bancarie (`100` iterazioni, cutoff `0`).
+   - Implementato in [SmartCategorizerService.java](../../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/SmartCategorizerService.java).
+   - Utilizza l'algoritmo di classificazione a Massima Entropia (`DocumentCategorizerME`) addestrato tramite [ExpenseModelTrainer.java](../../ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/ExpenseModelTrainer.java) su dataset di transazioni bancarie (`100` iterazioni, cutoff `0`).
    - Il modello binario pre-addestrato `expense-model.bin` viene caricato direttamente dalle risorse dell'applicazione all'avvio (`@PostConstruct`).
 2. **Livello Secondario: Fallback Euristico Deterministico**:
-   - Implementato in [ExpenseClassifier.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/ExpenseClassifier.java).
+   - Implementato in [ExpenseClassifier.java](../../ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/ExpenseClassifier.java).
    - Se il modello OpenNLP non è caricato, genera un'eccezione imprevista o la descrizione è vuota, il sistema interroga un dizionario statico di parole chiave categorizzate (*Supermercati e Alimentari*, *Ristorazione e Bar*, *Abbonamenti e Servizi Digitali*, *Trasporti*, *Carburante e Auto*, *Alloggi e Viaggi*, *Shopping e Abbigliamento*, *Pagamenti e Trasferimenti*).
 
 ---

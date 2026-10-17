@@ -49,11 +49,11 @@ La suite di test automatizzata conta **170 test totali**, tutti superati con suc
 ```
 
 ### Copertura del Codice JaCoCo (Istruzioni Eseguite):
-I dati estratti dai report [jacoco.csv](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/target/site/jacoco/jacoco.csv) evidenziano i seguenti livelli di copertura:
+I dati estratti dai report [jacoco.csv](../ExpenseMicroService/target/site/jacoco/jacoco.csv) evidenziano i seguenti livelli di copertura:
 
 | Modulo | Istruzioni Coperte | Istruzioni Totali | Percentuale di Copertura | Test Totali |
 | :--- | :--- | :--- | :--- | :--- |
-| **Gateway** | 539 | 733 | **73.53%** | 3 test class ([GatewaySecurityTest](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/test/java/com/spendy/gateway/JWT/GatewaySecurityTest.java), [SecurityConfigTest](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/test/java/com/spendy/gateway/JWT/SecurityConfigTest.java), [GatewayApplicationTest](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/test/java/com/spendy/gateway/GatewayApplicationTest.java)) |
+| **Gateway** | 539 | 733 | **73.53%** | 3 test class ([GatewaySecurityTest](../Gateway/src/test/java/com/spendy/gateway/JWT/GatewaySecurityTest.java), [SecurityConfigTest](../Gateway/src/test/java/com/spendy/gateway/JWT/SecurityConfigTest.java), [GatewayApplicationTest](../Gateway/src/test/java/com/spendy/gateway/GatewayApplicationTest.java)) |
 | **AuthMicroService** | 2.429 | 3.693 | **65.77%** | 13 test class |
 | **ExpenseMicroService** | 2.945 | 4.620 | **63.74%** | 17 test class |
 | **Totale Piattaforma** | **5.913** | **9.046** | **65.37%** | **170 test unitari e di integrazione** |
@@ -64,20 +64,20 @@ I dati estratti dai report [jacoco.csv](file:///Users/gius03/Progetti/SpendyProj
 
 Il codebase include test mirati alla verifica puntuale delle difese di sicurezza:
 
-1. **[JwtSecurityHardeningTest.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/test/java/com/spendy/auth/Security/JwtSecurityHardeningTest.java)**:
+1. **[JwtSecurityHardeningTest.java](../AuthMicroService/src/test/java/com/spendy/auth/Security/JwtSecurityHardeningTest.java)**:
    - Rifiuto categorico di token con algoritmo `none`.
    - Rifiuto di token con firma manomessa o calcolata con algoritmo simmetrico HS256 non autorizzato.
    - Rigetto immediato di token con claim obbligatori mancanti (`exp`, `iss`, `aud`, `sub`).
    - Rifiuto di token scaduti anche per 1 solo secondo.
-2. **[RateLimitingFilterSecurityTest.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/test/java/com/spendy/auth/Security/RateLimitingFilterSecurityTest.java)**:
+2. **[RateLimitingFilterSecurityTest.java](../AuthMicroService/src/test/java/com/spendy/auth/Security/RateLimitingFilterSecurityTest.java)**:
    - Verifica del blocco al raggiungimento dell'11° tentativo di login nello stesso minuto.
    - Calcolo accurato dell'header HTTP `Retry-After`.
    - Rifiuto dello spoofing dell'header `X-Forwarded-For` da nodi non riconosciuti come proxy fidati.
-3. **[SessionSecurityHardeningTest.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/test/java/com/spendy/auth/Security/SessionSecurityHardeningTest.java)**:
+3. **[SessionSecurityHardeningTest.java](../AuthMicroService/src/test/java/com/spendy/auth/Security/SessionSecurityHardeningTest.java)**:
    - Verifica della Refresh Token Rotation: emissione di un nuovo token e contestuale revoca del precedente.
    - Rilevamento del riutilizzo di token revocati e conseguente revoca a catena di tutti i token con lo stesso `family_id`.
    - Conferma che nel database viene salvato unicamente l'hash SHA-256 e che la colonna `token` è `NULL`.
-4. **[DeploymentSecurityHardeningTest.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/test/java/com/spendy/auth/Security/DeploymentSecurityHardeningTest.java)**:
+4. **[DeploymentSecurityHardeningTest.java](../AuthMicroService/src/test/java/com/spendy/auth/Security/DeploymentSecurityHardeningTest.java)**:
    - Verifica che l'avvio in modalità produzione fallisca con eccezione se `jwt.allow-ephemeral-keys=true` o se mancano le chiavi RSA.
 
 ---
@@ -111,7 +111,7 @@ mvn test -Dtest=SessionSecurityHardeningTest#testRefreshTokenReuseRevokesFamily
 
 Sebbene la suite unitaria e di integrazione sia solida (170 test), l'analisi del repository evidenzia le seguenti aree scoperte:
 1. **Test End-to-End su MySQL Reale**:
-   I test di integrazione JPA correnti ([AuthJpaPersistenceIntegrationTest](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/test/java/com/spendy/auth/Repository/AuthJpaPersistenceIntegrationTest.java) e [ExpenseJpaPersistenceIntegrationTest](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/test/java/com/spendyteam/expense/Repository/ExpenseJpaPersistenceIntegrationTest.java)) si appoggiano su un database in-memory H2 configurato con alias SQL ([H2FunctionAliases.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/test/java/com/spendyteam/expense/Utility/H2FunctionAliases.java)). Sarebbe opportuno integrare **Testcontainers** per validare le query native direttamente su un container MySQL 8.4 ufficiale.
+   I test di integrazione JPA correnti ([AuthJpaPersistenceIntegrationTest](../AuthMicroService/src/test/java/com/spendy/auth/Repository/AuthJpaPersistenceIntegrationTest.java) e [ExpenseJpaPersistenceIntegrationTest](../ExpenseMicroService/src/test/java/com/spendyteam/expense/Repository/ExpenseJpaPersistenceIntegrationTest.java)) si appoggiano su un database in-memory H2 configurato con alias SQL ([H2FunctionAliases.java](../ExpenseMicroService/src/test/java/com/spendyteam/expense/Utility/H2FunctionAliases.java)). Sarebbe opportuno integrare **Testcontainers** per validare le query native direttamente su un container MySQL 8.4 ufficiale.
 2. **Test di Carico e Stress Concurrent**:
    I precedenti test di performance sono stati dismessi (commit `1eeb583` e `3526a5c`). È raccomandata l'adozione di strumenti come k6 o Gatling per validare la tenuta del semaforo di persistenza (`ExpenseBatchWriter`) e del pool HikariCP sotto carichi elevati di importazione CSV.
 3. **Integrazione tra Gateway e Microservizi in Rete Reale**:

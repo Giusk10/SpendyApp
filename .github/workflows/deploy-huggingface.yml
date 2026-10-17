@@ -21,6 +21,9 @@ env:
   HF_USERNAME: ${{ secrets.HF_USERNAME || vars.HF_USERNAME }}
   SPACE_NAME: ${{ secrets.SPACE_NAME || vars.SPACE_NAME }}
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
     name: Deploy All-in-One Space

@@ -30,16 +30,13 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Spring Cloud & Documentation Versions -->
-        <spring-cloud.version>2025.0.0-RC1</spring-cloud.version>
+        <spring-cloud.version>2025.0.0</spring-cloud.version>
         <springdoc.version>2.8.5</springdoc.version>
 
         <!-- Common Library Versions -->
         <dotenv-java.version>3.0.0</dotenv-java.version>
         <opencsv.version>5.9</opencsv.version>
         <opennlp-tools.version>2.3.0</opennlp-tools.version>
-
-        <!-- Test Library Versions -->
-        <mockito-inline.version>5.2.0</mockito-inline.version>
 
         <!-- Plugin Versions -->
         <license-maven-plugin.version>2.4.0</license-maven-plugin.version>
@@ -88,14 +85,6 @@
                 <groupId>org.apache.opennlp</groupId>
                 <artifactId>opennlp-tools</artifactId>
                 <version>${opennlp-tools.version}</version>
-            </dependency>
-
-            <!-- Test Dependencies -->
-            <dependency>
-                <groupId>org.mockito</groupId>
-                <artifactId>mockito-inline</artifactId>
-                <version>${mockito-inline.version}</version>
-                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -163,10 +152,32 @@
                         </execution>
                     </executions>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>properties</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <argLine>@{argLine} -XX:+EnableDynamicAgentLoading -javaagent:${org.mockito:mockito-core:jar}</argLine>
+                    </configuration>
+                </plugin>
             </plugins>
         </pluginManagement>
 
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+            </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>license-maven-plugin</artifactId>
@@ -201,16 +212,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <repositories>
-        <repository>
-            <id>spring-milestones</id>
-            <name>Spring Milestones</name>
-            <url>https://repo.spring.io/milestone</url>
-            <snapshots>
-                <enabled>false</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
 
 </project>

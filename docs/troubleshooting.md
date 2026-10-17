@@ -27,7 +27,7 @@ docker compose logs --tail=20 mysql
 
 ### Soluzione
 - Se MySQL fallisce l'autenticazione, verificare che `MYSQL_PASSWORD` in `.env` corrisponda alla password inizializzata nel volume `spendy-mysql-data`.
-- Se si tratta di un timeout dovuto a risorse limitate della macchina host, aumentare il parametro `start_period` o i `retries` nei relativi healthcheck in [docker-compose.yml](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/docker-compose.yml).
+- Se si tratta di un timeout dovuto a risorse limitate della macchina host, aumentare il parametro `start_period` o i `retries` nei relativi healthcheck in [docker-compose.yml](../docker-compose.yml).
 
 ---
 
@@ -52,7 +52,7 @@ Copiare `.env.example` in `.env` o aggiungere la variabile mancante:
 ```bash
 echo "MYSQL_ROOT_PASSWORD=spendy_root_dev_password" >> .env
 ```
-In alternativa, eseguire lo script automatico [`./scripts/dev-up.sh`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/scripts/dev-up.sh) che gestisce la configurazione automatica di sviluppo.
+In alternativa, eseguire lo script automatico [`./scripts/dev-up.sh`](../scripts/dev-up.sh) che gestisce la configurazione automatica di sviluppo.
 
 ---
 

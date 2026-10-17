@@ -65,7 +65,7 @@ SpendyApp/
 ## 3. Avvio Rapido dell'Ambiente Locale
 
 ### 3.1. Avvio con Script Automatico (Consigliato)
-Lo script [`./scripts/dev-up.sh`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/scripts/dev-up.sh) si occupa di verificare i prerequisiti, inizializzare il file `.env`, generare le chiavi RSA in `keys/` se assenti, compilare e avviare i container, e attendere che il Gateway sia in stato `healthy`:
+Lo script [`./scripts/dev-up.sh`](../scripts/dev-up.sh) si occupa di verificare i prerequisiti, inizializzare il file `.env`, generare le chiavi RSA in `keys/` se assenti, compilare e avviare i container, e attendere che il Gateway sia in stato `healthy`:
 
 ```bash
 ./scripts/dev-up.sh

@@ -16,7 +16,7 @@ Tutte le richieste esterne devono essere indirizzate verso l'**API Gateway**:
 | :--- | :--- | :--- |
 | `Content-Type` | Sì (per richieste con body) | Generalmente `application/json` o `multipart/form-data` per upload CSV. |
 | `Authorization` | Sì (per endpoint protetti) | Token di accesso formattato come: `Bearer <accessToken>`. |
-| `Retry-After` | In risposta a HTTP 429 | Numero di secondi da attendere prima di ripetere la richiesta (generato da [RateLimitingFilter.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java)). |
+| `Retry-After` | In risposta a HTTP 429 | Numero di secondi da attendere prima di ripetere la richiesta (generato da [RateLimitingFilter.java](../AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java)). |
 
 ### 1.2. Mappatura dei Percorsi Gateway
 Il Gateway applica le seguenti regole di riscrittura (`RewritePath`):
@@ -30,7 +30,7 @@ Il Gateway applica le seguenti regole di riscrittura (`RewritePath`):
 ### 2.1. Verifica Stato Gateway (Root Health)
 - **Metodo**: `GET`
 - **Path Gateway**: `/`
-- **Classe Controller**: [GatewayApplication.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/main/java/com/spendy/gateway/GatewayApplication.java#L53-L56)
+- **Classe Controller**: [GatewayApplication.java](../Gateway/src/main/java/com/spendy/gateway/GatewayApplication.java#L53-L56)
 - **Autenticazione richiesta**: No (pubblico)
 - **Risposta `200 OK`**:
   ```text
@@ -42,7 +42,7 @@ Il Gateway applica le seguenti regole di riscrittura (`RewritePath`):
 ## 3. Endpoints di Autenticazione (`AuthMicroService`)
 
 Base path esterno via Gateway: `/Auth/rest/auth`  
-Classe Controller: [AuthController.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Controller/AuthController.java)
+Classe Controller: [AuthController.java](../AuthMicroService/src/main/java/com/spendy/auth/Controller/AuthController.java)
 
 ### 3.1. Registrazione Utente
 Crea un nuovo account nel database relazionale `spendy_auth.users`.
@@ -208,7 +208,7 @@ Espone il set di chiavi crittografiche pubbliche RSA per la verifica distribuita
 ## 4. Endpoints Gestione Spese (`ExpenseMicroService`)
 
 Base path esterno via Gateway: `/Expense/rest/expense`  
-Classe Controller: [ExpenseController.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Controller/ExpenseController.java)  
+Classe Controller: [ExpenseController.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Controller/ExpenseController.java)  
 *Tutti gli endpoint delle spese richiedono l'header `Authorization: Bearer <accessToken>`.*
 
 ### 4.1. Importazione Estratto Conto CSV
@@ -395,5 +395,5 @@ I tre microservizi generano automaticamente i contratti OpenAPI 3.0 via `springd
 | **ExpenseMicroService**| `/v3/api-docs` | `http://localhost:8084/swagger-ui.html` | `/Expense/v3/api-docs` |
 
 ### Discrepanze e Note Implementative Rilevate dal Codice:
-1. *Endpoint `/rest/expense/test`*: Nel codice di [ExpenseController.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Controller/ExpenseController.java#L574) è annotato con `@PostMapping`, mentre in alcuni client o documentazioni precedenti veniva trattato come GET. Inoltre, ricadendo sotto il path `/rest/expense/**`, è protetto dalla `SecurityFilterChain` di Spring Security e richiede un token valido, a differenza di `/actuator/health` che è pubblicamente accessibile.
-2. *Mappatura JAX-RS vs Spring Web*: In [AuthController.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Controller/AuthController.java) sono presenti annotazioni ibride sia JAX-RS (`@Path`, `@POST`, `@GET`, `@Produces`) sia Spring Web (`@RestController`, `@PostMapping`, `@GetMapping`). L'applicazione è configurata sia con Jersey che con Spring WebMVC, garantendo piena compatibilità con i client esistenti.
+1. *Endpoint `/rest/expense/test`*: Nel codice di [ExpenseController.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Controller/ExpenseController.java#L574) è annotato con `@PostMapping`, mentre in alcuni client o documentazioni precedenti veniva trattato come GET. Inoltre, ricadendo sotto il path `/rest/expense/**`, è protetto dalla `SecurityFilterChain` di Spring Security e richiede un token valido, a differenza di `/actuator/health` che è pubblicamente accessibile.
+2. *Mappatura JAX-RS vs Spring Web*: In [AuthController.java](../AuthMicroService/src/main/java/com/spendy/auth/Controller/AuthController.java) sono presenti annotazioni ibride sia JAX-RS (`@Path`, `@POST`, `@GET`, `@Produces`) sia Spring Web (`@RestController`, `@PostMapping`, `@GetMapping`). L'applicazione è configurata sia con Jersey che con Spring WebMVC, garantendo piena compatibilità con i client esistenti.

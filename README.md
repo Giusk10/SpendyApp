@@ -124,7 +124,7 @@ flowchart TD
   - Login con mitigazione dei timing attack tramite hash BCrypt fittizio per contrastare l'enumerazione utenti.
   - Emissione di Access Token JWT firmati con chiave privata RSA a 2048 bit (durata: 15 minuti).
   - Refresh Token Rotation atomica con rilevamento del riutilizzo (`family_id`), revoca a catena e salvataggio nel database unicamente del digest **SHA-256**.
-  - Filtro [RateLimitingFilter](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java) con verifica rigorosa dei proxy fidati.
+  - Filtro [RateLimitingFilter](AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java) con verifica rigorosa dei proxy fidati.
   - Endpoint pubblico RFC 7517 `/rest/auth/jwks.json`.
 
 ### 3. Expense Microservice
@@ -155,7 +155,7 @@ flowchart LR
 ```
 
 1. **Modello Machine Learning (`SmartCategorizerService`)**:
-   - Algoritmo di classificazione a Massima Entropia (**MaxEnt**) addestrato tramite [ExpenseModelTrainer.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/ExpenseModelTrainer.java).
+   - Algoritmo di classificazione a Massima Entropia (**MaxEnt**) addestrato tramite [ExpenseModelTrainer.java](ExpenseMicroService/src/main/java/com/spendyteam/expense/Training/ExpenseModelTrainer.java).
    - Esecuzione locale in microsecondi senza trasmissione di dati riservati a server o LLM esterni (GDPR compliant).
 2. **Dizionario Euristico di Fallback (`ExpenseClassifier`)**:
    - Assicura la classificazione anche in caso di formati anomali per macro-categorie: *Supermercati e Alimentari*, *Ristorazione e Bar*, *Abbonamenti e Servizi Digitali*, *Trasporti*, *Carburante e Auto*, *Alloggi e Viaggi*, *Shopping e Abbigliamento*, *Pagamenti e Trasferimenti*.
@@ -177,8 +177,8 @@ flowchart LR
 | **Hashing Credenziali** | jBCrypt 0.4 (Cost 12) | Hashing salted delle password con verifica a tempo costante |
 | **Machine Learning** | Apache OpenNLP 2.3.0 | Classificatore documentale Maximum Entropy per categorizzazione spese |
 | **CSV Processing** | OpenCSV 5.9 | Parser delimitato con auto-rilevamento separatori |
-| **Build System** | Maven 3.9+ | Gestione multi-modulo e plugin `license-maven-plugin` |
-| **Testing** | JUnit 5, Mockito, H2, JaCoCo | Suite di 170 test unitari, test di sicurezza e metriche di copertura |
+| **Build System** | Maven 3.9+ & Maven Wrapper | Gestione multi-modulo coordinata e plugin `license-maven-plugin` |
+| **Testing** | JUnit 5, Mockito, H2, JaCoCo | Suite di 354 test unitari, test di sicurezza e metriche di copertura |
 | **Containerizzazione** | Docker & Docker Compose | Immagine OCI multi-stage rootless (`user:1000`) e compose distribuito |
 
 ---
@@ -263,10 +263,10 @@ Tutte le chiamate dall'esterno devono essere inviate verso l'**API Gateway**:
 
 ### Prerequisiti
 - **Docker & Docker Compose** (raccomandato per avviare l'intero stack isolato)
-- **Java 21 LTS** & **Maven 3.9+** (per compilazione locale e test)
+- **Java 21 LTS** (Maven Wrapper `./mvnw` è incluso nel repository per build senza dipendenze globali)
 
 ### 1. Avvio dell'Ambiente Locale
-Per preparare le variabili d'ambiente, generare le chiavi RSA locali, avviare MySQL e tutti i microservizi con health check:
+Per preparare le variabili d'ambiente (copia automatica da `.env.example`), generare le chiavi RSA locali, avviare MySQL e tutti i microservizi con health check:
 ```bash
 ./scripts/dev-up.sh
 ```
@@ -294,14 +294,14 @@ Per arrestare i servizi preservando i dati nel volume MySQL:
 
 ## 🧪 Esecuzione dei Test e Build Maven
 
-La suite comprende oltre **170 test** automatizzati unitari e di integrazione (con database H2 in memoria):
+La suite comprende **354 test** automatizzati unitari, di sicurezza e di integrazione (163 in `AuthMicroService`, 21 in `Gateway`, 170 in `ExpenseMicroService` con database H2 in memoria):
 
 ```bash
-# Esecuzione di tutti i test
-mvn clean test
+# Esecuzione di tutti i test (tramite Maven Wrapper)
+./mvnw clean test
 
 # Verifica completa con controllo soglia JaCoCo e generazione report
-mvn clean verify
+./mvnw clean verify
 ```
 
 I report di copertura del codice JaCoCo vengono generati nei percorsi:

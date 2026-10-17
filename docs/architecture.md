@@ -43,12 +43,12 @@ flowchart TD
 
 ## 2. Componenti e Moduli del Sistema
 
-Il repository è strutturato come un progetto multi-modulo Apache Maven coordinato dal [pom.xml](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/pom.xml) radice. I moduli applicativi sono tre:
+Il repository è strutturato come un progetto multi-modulo Apache Maven coordinato dal [pom.xml](../pom.xml) radice. I moduli applicativi sono tre:
 
 ### 2.1. API Gateway (`Gateway/`)
 - **Ruolo**: Ingress reverse proxy reattivo e punto di terminazione perimetrale.
-- **Classe di avvio**: [GatewayApplication.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/main/java/com/spendy/gateway/GatewayApplication.java)
-- **Configurazione di sicurezza**: [SecurityConfig.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/main/java/com/spendy/gateway/JWT/SecurityConfig.java)
+- **Classe di avvio**: [GatewayApplication.java](../Gateway/src/main/java/com/spendy/gateway/GatewayApplication.java)
+- **Configurazione di sicurezza**: [SecurityConfig.java](../Gateway/src/main/java/com/spendy/gateway/JWT/SecurityConfig.java)
 - **Tecnologie**: Spring Cloud Gateway Server WebFlux, Reactor Netty, Spring Security Reactive OAuth2 Resource Server.
 - **Porta predefinita**: `7860` (ambiente produzione / Hugging Face Spaces e sviluppo locale; rimappabile sull'host tramite `GATEWAY_PORT`).
 - **Responsabilità**:
@@ -60,15 +60,15 @@ Il repository è strutturato come un progetto multi-modulo Apache Maven coordina
 
 ### 2.2. Auth Microservice (`AuthMicroService/`)
 - **Ruolo**: Identity Provider, gestione credenziali, emissione e rotazione token crittografici.
-- **Classe di avvio**: [AuthMicroServiceApplication.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/AuthMicroServiceApplication.java)
-- **Controller principale**: [AuthController.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Controller/AuthController.java)
-- **Servizio applicativo**: [AuthService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Service/AuthService.java)
-- **Gestore crittografico**: [JwtTokenService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/JwtTokenService.java)
-- **Filtro di protezione anti-bruteforce**: [RateLimitingFilter.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java)
+- **Classe di avvio**: [AuthMicroServiceApplication.java](../AuthMicroService/src/main/java/com/spendy/auth/AuthMicroServiceApplication.java)
+- **Controller principale**: [AuthController.java](../AuthMicroService/src/main/java/com/spendy/auth/Controller/AuthController.java)
+- **Servizio applicativo**: [AuthService.java](../AuthMicroService/src/main/java/com/spendy/auth/Service/AuthService.java)
+- **Gestore crittografico**: [JwtTokenService.java](../AuthMicroService/src/main/java/com/spendy/auth/Security/JwtTokenService.java)
+- **Filtro di protezione anti-bruteforce**: [RateLimitingFilter.java](../AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java)
 - **Tecnologie**: Spring Boot 3.5, Jersey 3.x JAX-RS, Spring Data JPA, Hibernate 6, Flyway, jBCrypt, Nimbus Jose+JWT.
 - **Porta interna**: `8081`.
 - **Responsabilità**:
-  1. *Registrazione utenti*: Validazione formati email, policy lunghezza password (8-128 caratteri) e hashing con [BCryptPasswordEncoder](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Config/SecurityConfig.java#L34-L36) a fattore costo 12.
+  1. *Registrazione utenti*: Validazione formati email, policy lunghezza password (8-128 caratteri) e hashing con [BCryptPasswordEncoder](../AuthMicroService/src/main/java/com/spendy/auth/Config/SecurityConfig.java#L34-L36) a fattore costo 12.
   2. *Autenticazione & Mitigazione Timing Attack*: Login con username o email con verifica costante delle password tramite hash fittizio in caso di utente inesistente.
   3. *Emissione JWT RS256*: Generazione di access token firmati con chiave RSA privata a 2048 bit, con `kid`, `iss`, `aud`, `exp` (15 minuti).
   4. *Gestione avanzata sessioni & Refresh Token Rotation*: Rotazione con rilevamento del riutilizzo (token reuse detection via `family_id`), revoca a catena della sessione compromessa e salvataggio nel database unicamente dell'hash SHA-256 del token.
@@ -76,13 +76,13 @@ Il repository è strutturato come un progetto multi-modulo Apache Maven coordina
 
 ### 2.3. Expense Microservice (`ExpenseMicroService/`)
 - **Ruolo**: Gestione delle transazioni finanziarie personali, elaborazione massiva di estratti conto CSV, analisi aggregata e categorizzazione automatica basata su NLP.
-- **Classe di avvio**: [ExpenseMicroServiceApplication.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/ExpenseMicroServiceApplication.java)
-- **Controller principale**: [ExpenseController.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Controller/ExpenseController.java)
-- **Servizio applicativo**: [ExpenseService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseService.java)
-- **Parser CSV ad alte prestazioni**: [ExpenseCsvParser.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseCsvParser.java)
-- **Persistenza batch controllata**: [ExpenseBatchWriter.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseBatchWriter.java)
-- **Motore di categorizzazione**: [SmartCategorizerService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/SmartCategorizerService.java) e fallback deterministico [ExpenseClassifier.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/ExpenseClassifier.java)
-- **Verifica crittografica identità**: [UserAuthService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/UserAuthService.java)
+- **Classe di avvio**: [ExpenseMicroServiceApplication.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/ExpenseMicroServiceApplication.java)
+- **Controller principale**: [ExpenseController.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Controller/ExpenseController.java)
+- **Servizio applicativo**: [ExpenseService.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseService.java)
+- **Parser CSV ad alte prestazioni**: [ExpenseCsvParser.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseCsvParser.java)
+- **Persistenza batch controllata**: [ExpenseBatchWriter.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseBatchWriter.java)
+- **Motore di categorizzazione**: [SmartCategorizerService.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/SmartCategorizerService.java) e fallback deterministico [ExpenseClassifier.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/ExpenseClassifier.java)
+- **Verifica crittografica identità**: [UserAuthService.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/UserAuthService.java)
 - **Tecnologie**: Spring Boot 3.5, Spring Data JPA, Hibernate 6, MySQL Connector, Flyway, Apache OpenNLP 2.3.0, OpenCSV 5.9, Nimbus Jose+JWT.
 - **Porta interna**: `8084`.
 - **Responsabilità**:
@@ -100,8 +100,8 @@ Il sistema adotta il pattern di separazione delle basi dati (Database-per-Servic
 
 | Servizio | Database / Schema | Entità Gestite | Migrazioni Schema |
 | :--- | :--- | :--- | :--- |
-| **AuthMicroService** | `spendy_auth` | [User.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Data/User.java), [RefreshToken.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Data/RefreshToken.java) | Flyway `V1`, `V2`, `V3` |
-| **ExpenseMicroService** | `spendy_expense` | [Expense.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Data/Expense.java) | Flyway `V1` |
+| **AuthMicroService** | `spendy_auth` | [User.java](../AuthMicroService/src/main/java/com/spendy/auth/Data/User.java), [RefreshToken.java](../AuthMicroService/src/main/java/com/spendy/auth/Data/RefreshToken.java) | Flyway `V1`, `V2`, `V3` |
+| **ExpenseMicroService** | `spendy_expense` | [Expense.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Data/Expense.java) | Flyway `V1` |
 
 I confini sono rigorosamente isolati:
 - `ExpenseMicroService` non accede mai alle tabelle `users` o `refresh_tokens`. L'identità dell'utente viene desunta estraendo e verificando crittograficamente il claim `sub` dal token JWT Bearer fornito nell'header HTTP `Authorization`.
@@ -178,18 +178,18 @@ sequenceDiagram
    - Sincrona tramite proxy reattivo non bloccante Netty. Il Gateway instrada direttamente la richiesta al socket HTTP del microservizio target.
 3. **Elaborazione Asincrona e Concorrente (In-Process)**:
    - **Java 21 Virtual Threads**: Abilitati globalmente con `spring.threads.virtual.enabled=true` in tutti i moduli.
-   - **Parsing parallelo**: [ExpenseCsvParser.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseCsvParser.java#L92) istanzia un `Executors.newVirtualThreadPerTaskExecutor()` per elaborare concorrentemente centinaia di righe CSV senza bloccare i thread del server.
-   - **Throttling I/O**: [ExpenseBatchWriter.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseBatchWriter.java#L25) disciplina le scritture concorrenti su disco tramite un semaforo a 10 permessi per proteggere la coda di connessione HikariCP.
+   - **Parsing parallelo**: [ExpenseCsvParser.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseCsvParser.java#L92) istanzia un `Executors.newVirtualThreadPerTaskExecutor()` per elaborare concorrentemente centinaia di righe CSV senza bloccare i thread del server.
+   - **Throttling I/O**: [ExpenseBatchWriter.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/ExpenseBatchWriter.java#L25) disciplina le scritture concorrenti su disco tramite un semaforo a 10 permessi per proteggere la coda di connessione HikariCP.
 
 ---
 
 ## 6. Limiti e Punti di Attenzione Architetturali
 
 1. **Deployment All-in-One vs Distribuito**:
-   - In ambienti come Hugging Face Spaces, l'intero ecosistema (Gateway, Auth, Expense) gira all'interno di un unico container Docker orchestrato tramite [entrypoint.sh](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/deploy/huggingface/entrypoint.sh). Questa configurazione richiede allocazioni di memoria controllate via `JAVA_TOOL_OPTIONS` e `Xmx` per evitare errori OutOfMemory.
+   - In ambienti come Hugging Face Spaces, l'intero ecosistema (Gateway, Auth, Expense) gira all'interno di un unico container Docker orchestrato tramite [entrypoint.sh](../deploy/huggingface/entrypoint.sh). Questa configurazione richiede allocazioni di memoria controllate via `JAVA_TOOL_OPTIONS` e `Xmx` per evitare errori OutOfMemory.
 2. **Assenza di Message Broker esterno**:
    - Attualmente non vi è un broker di messaggi distribuito (Kafka o RabbitMQ). Le comunicazioni e le reazioni tra domini sono disaccoppiate via token crittografici stateless (Zero-Trust).
 3. **Distribuzione Chiavi Crittografiche**:
    - In produzione, `JWT_PRIVATE_KEY` e `JWT_PUBLIC_KEY` devono essere fornite tramite variabili d'ambiente o secret montati. L'impiego di chiavi effimere viene esplicitamente bloccato all'avvio in modalità produzione (`JWT_ALLOW_EPHEMERAL_KEYS=false`).
 4. **Dipendenze native OpenNLP**:
-   - Il categorizzatore ML dipende dalla corretta disponibilità del file di risorse [expense-model.bin](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/resources/expense-model.bin). Qualora il modello non sia presente, il sistema ripiega in modo trasparente sul categorizzatore a regole [ExpenseClassifier](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/ExpenseClassifier.java).
+   - Il categorizzatore ML dipende dalla corretta disponibilità del file di risorse [expense-model.bin](../ExpenseMicroService/src/main/resources/expense-model.bin). Qualora il modello non sia presente, il sistema ripiega in modo trasparente sul categorizzatore a regole [ExpenseClassifier](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Utility/ExpenseClassifier.java).

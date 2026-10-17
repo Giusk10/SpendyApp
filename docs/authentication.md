@@ -7,12 +7,12 @@ Documentazione tecnica del sottosistema di identità, sicurezza crittografica e 
 ## 1. Architettura di Sicurezza
 
 SpendyApp adotta un modello di sicurezza distribuito **Zero-Trust** basato su:
-1. **Crittografia Asimmetrica RSA (RS256)**: L'[AuthMicroService](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/JwtTokenService.java) detiene la chiave privata RSA (a 2048 bit) ed è l'unica entità autorizzata a firmare i token. Tutti gli altri componenti ([Gateway](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/main/java/com/spendy/gateway/JWT/SecurityConfig.java) e [ExpenseMicroService](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/UserAuthService.java)) dispongono unicamente della chiave pubblica RSA corrispondente per verificare localmente la firma dei token senza comunicazioni sincrone di validazione.
-2. **Password Hashing con Salt**: Memorizzazione delle password utenti tramite [BCryptPasswordEncoder](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Config/SecurityConfig.java#L34-L36) con fattore di costo 12 (`2^12` iterazioni).
+1. **Crittografia Asimmetrica RSA (RS256)**: L'[AuthMicroService](../AuthMicroService/src/main/java/com/spendy/auth/Security/JwtTokenService.java) detiene la chiave privata RSA (a 2048 bit) ed è l'unica entità autorizzata a firmare i token. Tutti gli altri componenti ([Gateway](../Gateway/src/main/java/com/spendy/gateway/JWT/SecurityConfig.java) e [ExpenseMicroService](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Service/UserAuthService.java)) dispongono unicamente della chiave pubblica RSA corrispondente per verificare localmente la firma dei token senza comunicazioni sincrone di validazione.
+2. **Password Hashing con Salt**: Memorizzazione delle password utenti tramite [BCryptPasswordEncoder](../AuthMicroService/src/main/java/com/spendy/auth/Config/SecurityConfig.java#L34-L36) con fattore di costo 12 (`2^12` iterazioni).
 3. **Mitigazione Timing Attack per Enumerazione Utenti**: Verifica della password in tempo costante anche per utenti non censiti.
 4. **Refresh Token Rotation con Rilevamento Riutilizzo (RFC 6749 / OAuth 2.0 BCP)**: Gestione delle sessioni con rotazione automatica ad ogni utilizzo, isolamento per `family_id` e revoca immediata di tutti i token di una sessione in caso di tentativo di riutilizzo di un token già invalidato.
 5. **Hashing Crittografico dei Refresh Token**: I token di rinnovo non risiedono mai in chiaro nel database: la colonna `token` è mantenuta `NULL` per i nuovi record e viene memorizzato unicamente l'hash crittografico **SHA-256** nella colonna `token_hash`.
-6. **Rate Limiting Perimetrale**: Filtro [RateLimitingFilter](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java) con verifica rigorosa di `X-Forwarded-For` riservata ai soli proxy fidati.
+6. **Rate Limiting Perimetrale**: Filtro [RateLimitingFilter](../AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java) con verifica rigorosa di `X-Forwarded-For` riservata ai soli proxy fidati.
 
 ---
 
@@ -47,7 +47,7 @@ stateDiagram-v2
 | **Refresh Token** | 30 giorni | 32 byte casuali (Base64 URL-safe) | Solo hash **SHA-256** nella tabella `refresh_tokens` | Rinnovo periodico dell'Access Token |
 
 ### 2.1. Anatomia del JWT Access Token
-Un token generato da [JwtTokenService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/JwtTokenService.java#L201-L238) contiene:
+Un token generato da [JwtTokenService.java](../AuthMicroService/src/main/java/com/spendy/auth/Security/JwtTokenService.java#L201-L238) contiene:
 - **Header**:
   ```json
   {
@@ -69,7 +69,7 @@ Un token generato da [JwtTokenService.java](file:///Users/gius03/Progetti/Spendy
 
 ## 3. Gestione Credenziali e Login Anti-Enumeration
 
-All'atto del login in [AuthService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Service/AuthService.java#L66-L84):
+All'atto del login in [AuthService.java](../AuthMicroService/src/main/java/com/spendy/auth/Service/AuthService.java#L66-L84):
 1. L'utente può presentarsi specificando indifferentemente `username` o `email`.
 2. Se l'utente non viene trovato nel database, viene valutato un hash BCrypt fittizio precalcolato a costo 12 (`DUMMY_BCRYPT_HASH`):
    ```java
@@ -116,14 +116,14 @@ sequenceDiagram
 
 ### Aspetti Chiave di Concorrenza e Persistenza:
 - **Locking Pessimistico**: La lettura del token avviene tramite query `@Lock(PESSIMISTIC_WRITE)` (`findByTokenHashForUpdate`) per scongiurare race conditions causate da richieste di refresh simultanee inviate dalla stessa applicazione client.
-- **Rilevamento del Riutilizzo**: Se il client invia un token il cui flag `revoked` è già `true`, significa che un attaccante (o un client disallineato) sta tentando di utilizzare un vecchio token già ruotato. Il sistema invoca immediatamente [IRefreshTokenRepository.revokeFamily](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Repository/IRefreshTokenRepository.java#L40), invalidando tutti i token della famiglia `family_id` e costringendo il legittimo proprietario a riautenticarsi da capo.
+- **Rilevamento del Riutilizzo**: Se il client invia un token il cui flag `revoked` è già `true`, significa che un attaccante (o un client disallineato) sta tentando di utilizzare un vecchio token già ruotato. Il sistema invoca immediatamente [IRefreshTokenRepository.revokeFamily](../AuthMicroService/src/main/java/com/spendy/auth/Repository/IRefreshTokenRepository.java#L40), invalidando tutti i token della famiglia `family_id` e costringendo il legittimo proprietario a riautenticarsi da capo.
 - **Compatibilità Retroattiva**: Se nel database sono ancora presenti vecchi token memorizzati in chiaro (pre-migrazione `V3`), il sistema li legge, ne genera l'hash SHA-256 e azzera il campo `token` in chiaro alla prima rotazione.
 
 ---
 
 ## 5. Gestione delle Chiavi Crittografiche e Rotazione (Key Rotation)
 
-La classe [JwtTokenService.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/JwtTokenService.java) e la configurazione reattiva [SecurityConfig.java del Gateway](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/Gateway/src/main/java/com/spendy/gateway/JWT/SecurityConfig.java) supportano nativamente la rotazione periodica delle chiavi crittografiche tramite l'header standard `kid` (Key ID).
+La classe [JwtTokenService.java](../AuthMicroService/src/main/java/com/spendy/auth/Security/JwtTokenService.java) e la configurazione reattiva [SecurityConfig.java del Gateway](../Gateway/src/main/java/com/spendy/gateway/JWT/SecurityConfig.java) supportano nativamente la rotazione periodica delle chiavi crittografiche tramite l'header standard `kid` (Key ID).
 
 ### 5.1. Configurazione Chiavi e Variabili d'Ambiente
 1. **Chiave Privata (Auth Microservice)**:
@@ -152,7 +152,7 @@ Il sistema rileva automaticamente se l'ambiente di esecuzione corrisponde alla p
 
 ## 6. Rate Limiting e Protezione Brute-Force
 
-Il filtro [RateLimitingFilter](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java) protegge gli endpoint di autenticazione maggiormente esposti ad attacchi di forza bruta:
+Il filtro [RateLimitingFilter](../AuthMicroService/src/main/java/com/spendy/auth/Security/RateLimitingFilter.java) protegge gli endpoint di autenticazione maggiormente esposti ad attacchi di forza bruta:
 
 | Endpoint | Limite Richieste | Finestra Temporale | Azione al Superamento |
 | :--- | :--- | :--- | :--- |

@@ -61,7 +61,7 @@ Lo script restituisce:
 
 ## 3. Gestione e Consultazione dei Log
 
-Lo script [`./scripts/dev-logs.sh`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/scripts/dev-logs.sh) semplifica il monitoraggio in tempo reale:
+Lo script [`./scripts/dev-logs.sh`](../scripts/dev-logs.sh) semplifica il monitoraggio in tempo reale:
 
 ```bash
 # Visualizza i log aggregati di tutti i container

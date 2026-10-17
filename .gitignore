@@ -20,3 +20,9 @@ target/
 *.key
 *.crt
 **/keys/
+
+# OS and Log Artifacts
+.DS_Store
+*.log
+*.dump
+*.dumpstream

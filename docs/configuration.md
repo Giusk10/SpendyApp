@@ -7,7 +7,7 @@ Questa guida documenta in modo esaustivo tutte le variabili d'ambiente utilizzat
 ## 1. Principi di Sicurezza per la Configurazione
 
 1. **Nessun Segreto nel Version Control**: Il file `.env` e le chiavi crittografiche (`*.pem`, `*.key`) sono esclusi da Git tramite `.gitignore` e da Docker tramite `.dockerignore`.
-2. **Template Documentato**: Il file [`.env.example`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/.env.example) funge da modello unico con valori dimostrativi privi di segreti reali.
+2. **Template Documentato**: Il file [`.env.example`](../.env.example) funge da modello unico con valori dimostrativi privi di segreti reali.
 3. **Fail-Fast in Produzione**: Se mancano parametri obbligatori in produzione (ad esempio le chiavi RSA o le password del database), l'avvio si interrompe immediatamente con un codice di uscita diverso da zero.
 
 ---
@@ -69,7 +69,7 @@ Questa guida documenta in modo esaustivo tutte le variabili d'ambiente utilizzat
    ```bash
    cp .env.example .env
    ```
-2. Lo script [`./scripts/dev-up.sh`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/scripts/dev-up.sh) verifica la presenza di `.env` e crea automaticamente le chiavi RSA in `keys/` se non presenti.
+2. Lo script [`./scripts/dev-up.sh`](../scripts/dev-up.sh) verifica la presenza di `.env` e crea automaticamente le chiavi RSA in `keys/` se non presenti.
 
 ### 3.2. Ambiente Hugging Face Spaces (All-in-One)
 Nelle impostazioni dello Space (**Settings &rarr; Variables and Secrets**):

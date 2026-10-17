@@ -63,7 +63,7 @@ erDiagram
 ### 2.1. Schema `spendy_auth`
 
 #### Tabella `users`
-Definita in [V1__create_auth_schema.sql](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/resources/db/migration/V1__create_auth_schema.sql) e mappata dall'entità JPA [User.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Data/User.java).
+Definita in [V1__create_auth_schema.sql](../AuthMicroService/src/main/resources/db/migration/V1__create_auth_schema.sql) e mappata dall'entità JPA [User.java](../AuthMicroService/src/main/java/com/spendy/auth/Data/User.java).
 
 | Colonna | Tipo SQL | Vincoli | Descrizione |
 | :--- | :--- | :--- | :--- |
@@ -88,7 +88,7 @@ Definita in [V1__create_auth_schema.sql](file:///Users/gius03/Progetti/SpendyPro
 ---
 
 #### Tabella `refresh_tokens`
-Definita in [V1__create_auth_schema.sql](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/resources/db/migration/V1__create_auth_schema.sql), estesa in [V2__security_refresh_tokens_hardening.sql](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/resources/db/migration/V2__security_refresh_tokens_hardening.sql) e rilassata in [V3__security_refresh_tokens_null_token.sql](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/resources/db/migration/V3__security_refresh_tokens_null_token.sql). Mappata da [RefreshToken.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Data/RefreshToken.java).
+Definita in [V1__create_auth_schema.sql](../AuthMicroService/src/main/resources/db/migration/V1__create_auth_schema.sql), estesa in [V2__security_refresh_tokens_hardening.sql](../AuthMicroService/src/main/resources/db/migration/V2__security_refresh_tokens_hardening.sql) e rilassata in [V3__security_refresh_tokens_null_token.sql](../AuthMicroService/src/main/resources/db/migration/V3__security_refresh_tokens_null_token.sql). Mappata da [RefreshToken.java](../AuthMicroService/src/main/java/com/spendy/auth/Data/RefreshToken.java).
 
 | Colonna | Tipo SQL | Vincoli | Descrizione |
 | :--- | :--- | :--- | :--- |
@@ -114,7 +114,7 @@ Definita in [V1__create_auth_schema.sql](file:///Users/gius03/Progetti/SpendyPro
 ### 2.2. Schema `spendy_expense`
 
 #### Tabella `expenses`
-Definita in [V1__create_expense_schema.sql](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/resources/db/migration/V1__create_expense_schema.sql) e mappata dall'entità JPA [Expense.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Data/Expense.java).
+Definita in [V1__create_expense_schema.sql](../ExpenseMicroService/src/main/resources/db/migration/V1__create_expense_schema.sql) e mappata dall'entità JPA [Expense.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Data/Expense.java).
 
 | Colonna | Tipo SQL | Vincoli | Descrizione |
 | :--- | :--- | :--- | :--- |
@@ -145,7 +145,7 @@ Definita in [V1__create_expense_schema.sql](file:///Users/gius03/Progetti/Spendy
 ## 3. Strategie di Accesso ai Dati e Performance
 
 ### 3.1. Batch Inserts Ottimizzati con Hibernate
-In [ExpenseMicroService/application.properties](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/resources/application.properties#L22-L24):
+In [ExpenseMicroService/application.properties](../ExpenseMicroService/src/main/resources/application.properties#L22-L24):
 ```properties
 spring.jpa.properties.hibernate.jdbc.batch_size=500
 spring.jpa.properties.hibernate.order_inserts=true
@@ -154,7 +154,7 @@ spring.jpa.properties.hibernate.order_updates=true
 Queste direttive impongono al driver JDBC di raggruppare le istruzioni SQL `INSERT` in lotti unificati da 500 righe per volta, riducendo drasticamente il numero di round-trip di rete verso il server MySQL durante l'importazione di estratti conto massivi.
 
 ### 3.2. Aggregazione Mensile Push-Down al Database
-Nel repository [IExpenseRepository.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/Repository/IExpenseRepository.java#L60-L76), il calcolo dei totali per anno e mese non carica in memoria le singole entità ma esegue l'aggregazione nativamente all'interno dell'engine MySQL:
+Nel repository [IExpenseRepository.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/Repository/IExpenseRepository.java#L60-L76), il calcolo dei totali per anno e mese non carica in memoria le singole entità ma esegue l'aggregazione nativamente all'interno dell'engine MySQL:
 
 ```sql
 SELECT DATE_FORMAT(e.started_date, '%Y-%m') AS monthKey,
@@ -172,7 +172,7 @@ WHERE e.username = :username
 GROUP BY DATE_FORMAT(e.started_date, '%Y-%m')
 ORDER BY monthKey ASC
 ```
-I risultati sono mappati direttamente nell'interfaccia di proiezione Spring Data [MonthlyExpenseTotal.java](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/ExpenseMicroService/src/main/java/com/spendyteam/expense/DTO/MonthlyExpenseTotal.java).
+I risultati sono mappati direttamente nell'interfaccia di proiezione Spring Data [MonthlyExpenseTotal.java](../ExpenseMicroService/src/main/java/com/spendyteam/expense/DTO/MonthlyExpenseTotal.java).
 
 ---
 

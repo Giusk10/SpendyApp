@@ -26,7 +26,7 @@ Tuttavia, i refresh token tradizionali a lunga scadenza e riutilizzabili comport
    - Viene contestualmente emesso un nuovo refresh token valido (32 byte casuali crittografici) associato allo stesso `family_id`.
 2. **Rilevamento del Riutilizzo e Revoca a Catena (Reuse Detection)**:
    - Se il server riceve una richiesta di refresh specificando un token già marcato come `revoked`, scatta un allarme di sicurezza per furto di credenziali.
-   - Il metodo [IRefreshTokenRepository.revokeFamily](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/AuthMicroService/src/main/java/com/spendy/auth/Repository/IRefreshTokenRepository.java#L40) invalida istantaneamente **tutti i token appartenenti a quella famiglia di sessione**, bloccando sia l'attaccante che l'utente legittimo e costringendo a un nuovo login con password.
+   - Il metodo [IRefreshTokenRepository.revokeFamily](../../AuthMicroService/src/main/java/com/spendy/auth/Repository/IRefreshTokenRepository.java#L40) invalida istantaneamente **tutti i token appartenenti a quella famiglia di sessione**, bloccando sia l'attaccante che l'utente legittimo e costringendo a un nuovo login con password.
 3. **Hashing Crittografico SHA-256 nel Database**:
    - I token non vengono mai salvati in chiaro: il valore originale viene comunicato al client e nel database viene persistito unicamente il digest SHA-256 (`token_hash`), con la colonna `token` impostata a `NULL` (migrazioni Flyway `V2` e `V3`).
 4. **Locking Pessimistico Concorrente**:

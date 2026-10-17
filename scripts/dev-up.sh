@@ -32,18 +32,17 @@ else
     exit 1
 fi
 
-# 2. Controllo presenza file di configurazione .env
+# 2. Controllo e inizializzazione file di configurazione .env
 if [ ! -f "$REPO_ROOT/.env" ]; then
-    echo "❌ Errore: File di configurazione .env non trovato nella radice del progetto." >&2
     if [ -f "$REPO_ROOT/.env.example" ]; then
-        echo "💡 Per configurare l'ambiente di sviluppo locale, crea il file .env a partire dal template:" >&2
-        echo "   cp .env.example .env" >&2
-        echo "ℹ️  I valori in .env.example sono credenziali predefinite valide ESCLUSIVAMENTE per lo sviluppo locale." >&2
-        echo "   NON utilizzare tali credenziali di esempio in ambienti di produzione." >&2
+        echo "ℹ️  File .env non trovato: inizializzazione automatica per sviluppo locale da .env.example..."
+        cp "$REPO_ROOT/.env.example" "$REPO_ROOT/.env"
+        echo "✅ File .env locale creato da .env.example."
+        echo "ℹ️  I valori in .env.example sono credenziali predefinite valide ESCLUSIVAMENTE per lo sviluppo locale."
     else
-        echo "❌ Errore: Anche il file template .env.example è mancante." >&2
+        echo "❌ Errore: File di configurazione .env e template .env.example non trovati." >&2
+        exit 1
     fi
-    exit 1
 fi
 
 # 3. Preparazione chiavi RSA locali se assenti

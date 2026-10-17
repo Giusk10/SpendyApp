@@ -9,7 +9,7 @@ Questa directory contiene gli artefatti e le configurazioni dedicate al deployme
 - **Tipo di Space**: `docker`
 - **Porta Ingress Obbligatoria**: `7860` (HTTP)
 - **Utente di Esecuzione**: `user` con UID non privilegiato `1000`
-- **Architettura del Container**: All-in-One Multi-Processo supervisionato da [`entrypoint.sh`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/deploy/huggingface/entrypoint.sh).
+- **Architettura del Container**: All-in-One Multi-Processo supervisionato da [`entrypoint.sh`](entrypoint.sh).
 
 ```
                       Hugging Face Spaces Ingress (Porta 7860)
@@ -64,7 +64,7 @@ Nelle impostazioni dello Space (**Settings &rarr; Variables and Secrets**), conf
 
 ---
 
-## 3. Flusso di Avvio e Supervisione ([`entrypoint.sh`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/deploy/huggingface/entrypoint.sh))
+## 3. Flusso di Avvio e Supervisione ([`entrypoint.sh`](entrypoint.sh))
 
 1. **Rilevamento Ambiente e Controllo Chiavi**:
    - In produzione (`ENVIRONMENT=production`), valida la presenza di `JWT_PRIVATE_KEY` e `JWT_PUBLIC_KEY`. Se assenti, l'avvio si interrompe immediatamente con codice di errore `1`.

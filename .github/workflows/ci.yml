@@ -11,6 +11,9 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     name: Build & Test (Java 21)
@@ -32,14 +35,16 @@ jobs:
           MYSQL_ROOT_PASSWORD: ci-root-password
           MYSQL_PASSWORD: ci-shared-password
         run: |
-          bash -n scripts/dev-up.sh scripts/smoke-test.sh
+          bash -n scripts/dev-up.sh scripts/dev-down.sh scripts/dev-logs.sh scripts/smoke-test.sh
           sh -n db/init/99-init-users.sh
           test "$(find db/init -maxdepth 1 -type f | sort | head -n 1)" = "db/init/00-init-db.sql"
           test "$(find db/init -maxdepth 1 -type f | sort | tail -n 1)" = "db/init/99-init-users.sh"
           docker compose config --quiet
 
-      - name: Build and Test with Maven
-        run: mvn clean verify -B
+      - name: Build and Test with Maven Wrapper
+        run: |
+          chmod +x mvnw
+          ./mvnw clean verify -B
 
       - name: Upload Surefire Test Reports
         if: always()

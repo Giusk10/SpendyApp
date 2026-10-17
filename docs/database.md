@@ -89,7 +89,7 @@ volumes:
   mysql-data:
     name: spendy-mysql-data
 ```
-- Il comando standard [`./scripts/dev-down.sh`](file:///Users/gius03/Progetti/SpendyProject/SpendyApp/scripts/dev-down.sh) esegue `docker compose down` **senza il flag `-v`**, preservando intatti i dati tra riavvii successivi.
+- Il comando standard [`./scripts/dev-down.sh`](../scripts/dev-down.sh) esegue `docker compose down` **senza il flag `-v`**, preservando intatti i dati tra riavvii successivi.
 - **Comportamento su volumi esistenti**: Se il volume esiste già, MySQL salta l'esecuzione di `init-db.sql` e carica direttamente i dati presenti. Flyway legge la tabella `flyway_schema_history` e applica unicamente le migrazioni non ancora eseguite.
 
 ---
